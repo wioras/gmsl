@@ -1023,8 +1023,7 @@ async function sendEvkitCmd(cmdClean, timeoutMs = 120) {
     state.evkitLineBuf += dec.decode(res.value, { stream: true });
     let idx;
     while ((idx = state.evkitLineBuf.indexOf("\n")) >= 0) {
-      const line = state.evkitLineBuf.slice(0, idx).replace(/
-/g, "").trim();
+      const line = state.evkitLineBuf.slice(0, idx).replace(/\r/g, "").trim();
       state.evkitLineBuf = state.evkitLineBuf.slice(idx + 1);
       if (!line || line.toUpperCase() === cmdClean.trim().toUpperCase()) continue;
       if (line.toUpperCase().includes("ERR") || line.toUpperCase().includes("NACK")) {
@@ -1177,9 +1176,7 @@ function analyzeScriptTopology(text) {
   let curLink = null;
   const linkToSer = {};
 
-  for (const rl of text.split(/
-?
-/)) {
+  for (const rl of text.split(/\r?\n/)) {
     const p = parseScriptLine(rl);
     if (!p || p.kind !== "WRITE") continue;
     if (p.dev === DES_ADDR && (p.reg === 0x0F00 || p.reg === 0x0010)) {
@@ -1244,9 +1241,7 @@ document.getElementById("fileInitScript").addEventListener("change", async ev =>
 async function runInitScript(turbo = true) {
   if (!state.evkitPort) throw new Error("Connect EVKIT USB/COM port first!");
   if (!state.scriptText) throw new Error("Upload a camera init script (.txt) first!");
-  const lines = state.scriptText.split(/
-?
-/);
+  const lines = state.scriptText.split(/\r?\n/);
 
   await withEvkitLock(async () => {
     const t0 = performance.now();
@@ -1790,9 +1785,7 @@ function computeSparamLimit(level, rate, param, fMhz) {
 
 function parseVnaCsv(text, filename) {
   const rows = [];
-  for (const raw of text.split(/
-?
-/)) {
+  for (const raw of text.split(/\r?\n/)) {
     const c = raw.split(",").map(s => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
     if (!c.length || c[0].startsWith("#") || c[0].startsWith("//")) continue;
     const f = parseFloat(c[0]), v1 = parseFloat(c[1]);
@@ -1971,9 +1964,7 @@ document.getElementById("fileTdrCsv").addEventListener("change", async ev => {
   if (!f) return;
   try {
     const rows = [];
-    for (const raw of (await f.text()).split(/
-?
-/)) {
+    for (const raw of (await f.text()).split(/\r?\n/)) {
       const c = raw.split(",").map(s => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
       if (!c.length || c[0].startsWith("#")) continue;
       const t = parseFloat(c[0]), z = parseFloat(c[1]);
@@ -2012,8 +2003,7 @@ async function psuQuery(cmd) {
   while ((performance.now() - t0) < 500) {
     const idx = state.psuLineBuf.indexOf("\n");
     if (idx >= 0) {
-      const line = state.psuLineBuf.slice(0, idx).replace(/
-/g, "").trim();
+      const line = state.psuLineBuf.slice(0, idx).replace(/\r/g, "").trim();
       state.psuLineBuf = state.psuLineBuf.slice(idx + 1);
       return line;
     }
@@ -2181,9 +2171,7 @@ document.getElementById("btnI2cQuickWrite").addEventListener("click", async () =
 });
 
 document.getElementById("btnSendI2cBatch").addEventListener("click", async () => {
-  const lines = document.getElementById("txtI2cBatch").value.split(/
-?
-/);
+  const lines = document.getElementById("txtI2cBatch").value.split(/\r?\n/);
   await withEvkitLock(async () => {
     for (let i = 0; i < lines.length; i++) {
       const p = parseScriptLine(lines[i]);
