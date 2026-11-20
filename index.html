@@ -1,0 +1,2501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Valeo – GMSL2 Pulse (Cloud Web Serial Edition)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --valeo-dark: #002D3A;
+    --valeo-darker: #001B24;
+    --valeo-green: #80C342;
+    --bg-main: #F3F6F8;
+    --card-bg: #FFFFFF;
+    --border-col: #D6DFE5;
+    --text-main: #1A242B;
+    --text-muted: #5A6B75;
+    --pass-bg: #D4EDDA;
+    --pass-fg: #007E33;
+    --fail-bg: #F8D7DA;
+    --fail-fg: #B81D13;
+  }
+  * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+  body { margin: 0; background: var(--bg-main); color: var(--text-main); }
+
+  /* Header Banner */
+  .header-banner {
+    background: var(--valeo-dark);
+    color: #fff;
+    padding: 12px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .brand-box { display: flex; align-items: center; gap: 16px; }
+  .valeo-logo {
+    color: var(--valeo-green);
+    font-family: 'Arial Black', sans-serif;
+    font-style: italic;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+  }
+  .app-title { font-size: 19px; font-weight: 700; }
+  .app-sub { font-size: 12px; color: #B0BEC5; margin-top: 2px; }
+  .status-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    background: var(--valeo-darker);
+    border: 1px solid #455A64;
+    color: #FFC107;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .badge.ok { border-color: var(--valeo-green); color: var(--valeo-green); }
+  .badge.err { border-color: #FF5252; color: #FF5252; }
+  .portb-note { font-size: 11px; color: #B0BEC5; font-style: italic; }
+
+  /* Tabs Navigation */
+  .tab-bar {
+    display: flex;
+    flex-wrap: wrap;
+    background: #E4EBEF;
+    border-bottom: 2px solid var(--valeo-dark);
+    padding: 6px 12px 0 12px;
+    gap: 4px;
+  }
+  .tab-btn {
+    background: #CFD9DF;
+    border: 1px solid #B8C7D0;
+    border-bottom: none;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #263238;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .tab-btn:hover:not(:disabled) { background: #DCE5EA; }
+  .tab-btn.active {
+    background: var(--card-bg);
+    color: var(--valeo-dark);
+    border-top: 3px solid var(--valeo-green);
+  }
+  .tab-btn:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+  }
+
+  /* Main Container */
+  .container { padding: 14px 18px; max-width: 1480px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-col);
+    border-radius: 7px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--valeo-dark);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #E8EEF2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-2-asym { display: grid; grid-template-columns: 430px 1fr; gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 1050px) {
+    .grid-2, .grid-2-asym, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  .form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+  label { font-size: 12.5px; font-weight: 600; color: #263238; }
+  input[type="text"], input[type="number"], select, textarea {
+    padding: 6px 9px;
+    border: 1px solid #B8C7D0;
+    border-radius: 4px;
+    font-size: 13px;
+    background: #fff;
+  }
+  input.mono, textarea.mono { font-family: 'Consolas', monospace; }
+
+  button.btn {
+    padding: 7px 14px;
+    border-radius: 5px;
+    border: 1px solid #90A4AE;
+    background: #ECEFF1;
+    color: #1A242B;
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  button.btn:hover:not(:disabled) { filter: brightness(0.95); }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.btn-primary { background: var(--valeo-dark); color: #fff; border-color: var(--valeo-dark); }
+  button.btn-green { background: #E8F5E9; color: #1B5E20; border-color: #81C784; }
+  button.btn-red { background: #FFEBEE; color: #B71C1C; border-color: #E57373; }
+  button.btn-blue { background: #E3F2FD; color: #0D47A1; border-color: #64B5F6; }
+
+  .log-box {
+    background: #1E1E1E;
+    color: #E8EAED;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    padding: 10px;
+    border-radius: 5px;
+    height: 270px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.4;
+  }
+
+  .led {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid #333;
+    vertical-align: middle;
+  }
+  .led-green { background: #00C853; }
+  .led-red { background: #FF1744; }
+  .led-amber { background: #FFC107; }
+  .led-gray { background: #78909C; }
+
+  .verdict-pill {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .verdict-pass { background: var(--pass-bg); color: var(--pass-fg); }
+  .verdict-fail { background: var(--fail-bg); color: var(--fail-fg); }
+  .verdict-warn { background: #FEF3C7; color: #B45309; }
+
+  progress { width: 100%; height: 14px; accent-color: var(--valeo-green); }
+
+  table.data-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.data-tbl th {
+    background: var(--valeo-dark);
+    color: #fff;
+    padding: 7px 8px;
+    text-align: center;
+  }
+  table.data-tbl td {
+    border: 1px solid #D6DFE5;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  tr.row-pass { background: #D4EDDA; color: #155724; font-weight: 600; }
+  tr.row-fail { background: #F8D7DA; color: #721C24; font-weight: 600; }
+
+  .psu-meter {
+    background: #0D1B22;
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .meter-val-v { font-family: 'Consolas', monospace; font-size: 24px; font-weight: 700; color: #80C342; }
+  .meter-val-i { font-family: 'Consolas', monospace; font-size: 24px; font-weight: 700; color: #4FC3F7; }
+  .meter-val-p { font-family: 'Consolas', monospace; font-size: 18px; font-weight: 700; color: #FFD54F; }
+  .meter-lbl { font-size: 10px; color: #90A4AE; font-weight: 700; letter-spacing: 0.5px; }
+
+  .webserial-warn {
+    background: #FFF3CD;
+    border: 1px solid #FFCA28;
+    color: #664D03;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-banner">
+  <div class="brand-box">
+    <div class="valeo-logo">Valeo</div>
+    <div>
+      <div class="app-title">GMSL2 Pulse <span style="font-size:12px; color:#80C342;">(Cloud Web Serial Edition)</span></div>
+      <div class="app-sub" id="hdrTopology">Topology: Auto-Detect (PHYA / PHYB) | Browser Direct USB/COM</div>
+    </div>
+  </div>
+  <div class="status-badges">
+    <div class="badge-row">
+      <span class="badge err" id="badgePortA">Port A: Link Lock NOT OK</span>
+      <span class="badge err" id="badgePortB">Port B: Link Lock NOT OK</span>
+      <span class="badge" id="badgePsu">PSU: OFF</span>
+    </div>
+    <div class="portb-note">Aktywacja Portu B jest możliwa tylko po wgraniu skryptu init dla kamery</div>
+  </div>
+</div>
+
+<div class="tab-bar" id="tabBar">
+  <button class="tab-btn active" data-tab="tab-conn">Camera connection</button>
+  <button class="tab-btn" id="btnTabMargin" data-tab="tab-margin" disabled>Link Margin</button>
+  <button class="tab-btn" id="btnTabEeprom" data-tab="tab-eeprom" disabled>EEPROM</button>
+  <button class="tab-btn" id="btnTabErrb" data-tab="tab-errb" disabled>ERRB Monitor</button>
+  <button class="tab-btn" data-tab="tab-sparam">S-Parameters</button>
+  <button class="tab-btn" data-tab="tab-tdr">TDR</button>
+  <button class="tab-btn" data-tab="tab-psu">Power Supply (PL303QMD-P)</button>
+  <button class="tab-btn" id="btnTabAuto" data-tab="tab-auto" disabled>Automatic Test</button>
+  <button class="tab-btn" id="btnTabSoak" data-tab="tab-soak" disabled>Long-Run Soak Test</button>
+  <button class="tab-btn" id="btnTabI2c" data-tab="tab-i2c" disabled>I2C Communication</button>
+</div>
+
+<div class="container">
+  <div class="webserial-warn" id="webSerialWarn">
+    <strong>Browser Notice:</strong> Your browser does not support the <b>Web Serial API</b> or this page is not served over <b>HTTPS / localhost</b>.
+    Offline tabs (<b>S-Parameters</b> &amp; <b>TDR</b>) work in any browser; for direct USB/COM EVKIT &amp; PSU testing, open this HTTPS URL in <b>Google Chrome</b> or <b>Microsoft Edge</b>.
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 1: CAMERA CONNECTION                                              -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel active" id="tab-conn">
+    <div class="card">
+      <div class="card-title">Step 1: Select Local USB / COM Port (EVKIT Connection via Web Serial API)</div>
+      <div class="form-row">
+        <button class="btn btn-primary" id="btnConnectEvkit">Connect EVKIT (USB / COM)</button>
+        <button class="btn btn-red" id="btnDisconnectEvkit" disabled>Disconnect EVKIT</button>
+        <button class="btn" id="btnPollLocks" disabled>Check Link Lock Now</button>
+        <span id="lblEvkitPortStatus" style="font-size:13px; font-weight:600; color:#5A6B75;">Status: Not connected (Click Connect EVKIT to choose your local COM port)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Step 2: Camera Initialization Script (I2C Init Script .txt / .csv)</div>
+      <div class="form-row">
+        <input type="file" id="fileInitScript" accept=".txt,.cfg,.i2c,.csv" />
+        <label><input type="checkbox" id="chkTurboInit" checked /> Turbo Mode (Fast Send)</label>
+        <button class="btn btn-primary" id="btnSendScript">Send Script Now</button>
+      </div>
+      <div id="lblScriptSummary" style="font-size:12.5px; color:#002D3A; font-weight:600; margin-top:4px;">
+        No initialization script loaded yet.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>Connection &amp; Script Execution Log</span>
+        <button class="btn" onclick="clearLog('logConn')">Clear Log</button>
+      </div>
+      <div class="log-box" id="logConn"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 2: LINK MARGIN                                                    -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-margin">
+    <div class="card">
+      <div class="card-title">Measurement Parameters &amp; Optional Test Metadata</div>
+      <div class="form-row">
+        <label>Target Camera(s):</label>
+        <select id="selMarginCam">
+          <option value="PHYA ONLY">PHYA ONLY</option>
+        </select>
+        <label>Channel Direction:</label>
+        <select id="selMarginDir">
+          <option value="BOTH (FWD + REV)">BOTH (FWD + REV)</option>
+          <option value="FWD ONLY">FWD ONLY</option>
+          <option value="REV ONLY">REV ONLY</option>
+        </select>
+        <label>Dwell [s]:</label>
+        <select id="selMarginDwell">
+          <option value="0.1">0.1</option>
+          <option value="0.5" selected>0.5</option>
+          <option value="1.0">1.0</option>
+          <option value="2.0">2.0</option>
+        </select>
+        <button class="btn btn-primary" id="btnStartMargin">START TEST</button>
+        <button class="btn btn-red" id="btnStopMargin" disabled>STOP</button>
+        <button class="btn btn-blue" id="btnExportMarginXls" disabled>Export XLS Report</button>
+      </div>
+      <div class="form-row" style="margin-bottom:0;">
+        <label>Harness length:</label><input type="text" id="inHarnessLen" style="width:120px;" />
+        <label>Harness type:</label><input type="text" id="inHarnessType" style="width:140px;" />
+        <label>Voltage level:</label><input type="text" id="inVoltageLvl" style="width:120px;" />
+        <span style="font-size:11.5px; color:#666;">(Optional metadata for Excel Report)</span>
+      </div>
+    </div>
+
+    <div class="grid-2-asym">
+      <div>
+        <div class="card">
+          <div class="card-title">Validation Results (GMSL2 Criteria: PHYA &amp; PHYB)</div>
+          <div id="lblMarginStatus" style="font-weight:700; font-size:13px; margin-bottom:4px;">Status: Ready</div>
+          <div id="lblMarginStep" style="font-size:12px; color:#555; margin-bottom:8px;">Current Step: ---</div>
+          <hr style="border:none; border-top:1px solid #E0E6EA;" />
+          <div style="font-size:12.5px; line-height:1.8;">
+            <div><b>[Camera PHYA]</b></div>
+            <div>&nbsp;&nbsp;PHYA FWD: <span id="resPhyaFwd">Pending</span></div>
+            <div>&nbsp;&nbsp;PHYA REV: <span id="resPhyaRev">Pending</span></div>
+            <hr style="border:none; border-top:1px solid #E0E6EA;" />
+            <div><b>[Camera PHYB]</b></div>
+            <div>&nbsp;&nbsp;PHYB FWD: <span id="resPhybFwd">Pending</span></div>
+            <div>&nbsp;&nbsp;PHYB REV: <span id="resPhybRev">Pending</span></div>
+            <hr style="border:none; border-top:1px solid #E0E6EA;" />
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <b>FINAL VERDICT:</b>
+              <span id="resMarginOverall" class="verdict-pill">---</span>
+            </div>
+          </div>
+          <div style="margin-top:10px;"><progress id="progMargin" value="0" max="100"></progress></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Event Log</span>
+            <button class="btn" onclick="clearLog('logMargin')">Clear Log</button>
+          </div>
+          <div class="log-box" id="logMargin" style="height:210px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Measurement Trace (PHYA &amp; PHYB Link Margin)</div>
+        <div style="height:430px; position:relative;">
+          <canvas id="chartMargin"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 3: EEPROM                                                         -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-eeprom">
+    <div class="card">
+      <div class="card-title">EEPROM &amp; Write Protection GPIO Configuration (PHYA / PHYB)</div>
+      <div class="form-row" style="margin-bottom:0;">
+        <label>Target Camera:</label>
+        <select id="selEepromCam"><option value="PHYA">PHYA</option></select>
+        <label>EEPROM I2C Addr:</label><input type="text" id="inEepromAddr" class="mono" value="0x70" style="width:75px;" />
+        <label>WP GPIO Reg:</label><input type="text" id="inEepromWpReg" class="mono" value="0x3053" style="width:80px;" />
+        <label>WP On:</label><input type="text" id="inWpOnVal" class="mono" value="0x28" style="width:65px;" />
+        <label>WP Off:</label><input type="text" id="inWpOffVal" class="mono" value="0x20" style="width:65px;" />
+      </div>
+    </div>
+
+    <div class="grid-2-asym">
+      <div>
+        <div class="card">
+          <div class="card-title">EEPROM Write Protection Status</div>
+          <div id="lblEepromCamHdr" style="font-weight:700; margin-bottom:8px;">Selected Camera: PHYA (Serializer 0x80)</div>
+          <div style="margin-bottom:6px;"><span class="led led-gray" id="ledWpDisabled"></span> <b>WRITE PROTECTION Disabled</b></div>
+          <div style="margin-bottom:10px;"><span class="led led-gray" id="ledWpEnabled"></span> <b>WRITE PROTECTION Enabled</b></div>
+          <div class="form-row">
+            <button class="btn btn-green" id="btnWpDisable">Disable write protection</button>
+            <button class="btn btn-red" id="btnWpEnable">Enable write protection</button>
+            <button class="btn" id="btnWpRead">Read Current WP State</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Reading and writing into EEPROM</div>
+          <div id="lblEepromLockHint" style="font-size:12px; color:#B71C1C; margin-bottom:8px;">
+            Disable Write Protection first to unlock EEPROM write/verify.
+          </div>
+          <div class="form-row">
+            <label style="width:170px;">Register Address (hex):</label>
+            <input type="text" id="inEepromReg" class="mono" value="0x00" style="width:90px;" />
+          </div>
+          <div class="form-row">
+            <label style="width:170px;">Data Value (8/16-bit hex):</label>
+            <input type="text" id="inEepromVal" class="mono" value="0xBC" style="width:90px;" />
+          </div>
+          <div class="form-row">
+            <button class="btn btn-blue" id="btnEepromWriteVerify" disabled>Write &amp; Verify EEPROM</button>
+            <button class="btn" id="btnEepromReadOnly" disabled>Read Register</button>
+          </div>
+          <div style="margin-top:6px; font-size:13px;"><b>Verify Result:</b> <span id="lblEepromVerify" class="mono">---</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>Event Log (I2C Communication)</span>
+          <button class="btn" onclick="clearLog('logEeprom')">Clear Log</button>
+        </div>
+        <div class="log-box" id="logEeprom" style="height:370px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 4: ERRB MONITOR                                                   -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-errb">
+    <div class="card">
+      <div class="form-row" style="margin-bottom:0;">
+        <label>Monitor Camera:</label>
+        <select id="selErrbCam"><option value="PHYA">PHYA</option></select>
+        <span><b>PHYA ERRB:</b> <span class="led led-gray" id="ledErrbGlobA"></span></span>
+        <span><b>PHYB ERRB:</b> <span class="led led-gray" id="ledErrbGlobB"></span></span>
+        <button class="btn" id="btnErrbRefresh">Refresh Status</button>
+        <button class="btn btn-primary" id="btnErrbClearSticky">Clear Sticky (Active Cam)</button>
+        <span style="margin-left:auto; font-size:12px;">
+          <span class="led led-green"></span> OK &nbsp;
+          <span class="led led-red"></span> ERR (OEN=1) &nbsp;
+          <span class="led led-amber"></span> ERR (OEN=0)
+        </span>
+      </div>
+    </div>
+
+    <div class="grid-4" id="errbGroupsGrid"></div>
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-title">
+        <span>ERRB Monitor Event Log</span>
+        <button class="btn" onclick="clearLog('logErrb')">Clear Log</button>
+      </div>
+      <div class="log-box" id="logErrb" style="height:140px;"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 5: S-PARAMETERS (OFFLINE ANALYZER)                                -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-sparam">
+    <div class="card">
+      <div class="card-title">S-Parameter CSV Loader &amp; GMSL2 Specification Settings (Offline Mode — Works in Any Browser)</div>
+      <div class="form-row">
+        <label>Test Level:</label>
+        <select id="selSparamLevel">
+          <option value="System Level">System Level</option>
+          <option value="PCB Level">PCB Level</option>
+        </select>
+        <label>GMSL2 Data Rate:</label>
+        <select id="selSparamRate">
+          <option value="6 Gbps" selected>6 Gbps</option>
+          <option value="3 Gbps">3 Gbps</option>
+        </select>
+        <label>Frequency Axis:</label>
+        <select id="selSparamScale">
+          <option value="linear">Linear (MHz)</option>
+          <option value="logarithmic">Logarithmic (MHz)</option>
+        </select>
+        <label>Sample ID:</label><input type="text" id="inSparamSample" style="width:110px;" />
+        <label>Harness:</label><input type="text" id="inSparamHarness" style="width:100px;" />
+        <button class="btn btn-blue" id="btnExportSparamXls" disabled>Export XLS Report</button>
+      </div>
+      <div class="form-row" style="margin-bottom:0;">
+        <label>Insertion Loss (.csv):</label><input type="file" id="fileSparamIl" accept=".csv" />
+        <label>Return Loss (.csv):</label><input type="file" id="fileSparamRl" accept=".csv" />
+        <button class="btn" id="btnClearSparam">Clear</button>
+      </div>
+    </div>
+
+    <div class="grid-2-asym">
+      <div>
+        <div class="card">
+          <div class="card-title">GMSL2 Channel Specification Verdict</div>
+          <div id="lblSparamSpec" style="font-size:12.5px; font-weight:700; color:#002D3A; margin-bottom:8px;">
+            Active Limit Mask: System Level | GMSL2 6 Gbps (Eval: 2 - 3500 MHz)
+          </div>
+          <div style="margin-bottom:8px;">
+            <b>Insertion Loss:</b> <span id="lblSparamIlStat" class="verdict-pill">NOT LOADED</span>
+            <div id="lblSparamIlDet" style="font-size:12px; color:#555; margin-top:3px;">Worst Margin: ---</div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <b>Return Loss:</b> <span id="lblSparamRlStat" class="verdict-pill">NOT LOADED</span>
+            <div id="lblSparamRlDet" style="font-size:12px; color:#555; margin-top:3px;">Worst Margin: ---</div>
+          </div>
+          <hr style="border:none; border-top:1px solid #E0E6EA;" />
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>FINAL S-PARAM VERDICT:</b>
+            <span id="lblSparamOverall" class="verdict-pill">---</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>S-Parameter Analysis Log</span><button class="btn" onclick="clearLog('logSparam')">Clear Log</button></div>
+          <div class="log-box" id="logSparam" style="height:220px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">S-Parameters Result vs GMSL2 Limit Masks</div>
+        <div style="height:230px; margin-bottom:14px;"><canvas id="chartSparamIl"></canvas></div>
+        <div style="height:230px;"><canvas id="chartSparamRl"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 6: TDR (OFFLINE ANALYZER)                                         -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-tdr">
+    <div class="card">
+      <div class="card-title">GMSL2 TDR Impedance Compliance Validator (Informational: 50 &Omega; &plusmn; 10% [45–55 &Omega;])</div>
+      <div class="form-row" style="margin-bottom:0;">
+        <label>TDR Trace (.csv):</label><input type="file" id="fileTdrCsv" accept=".csv" />
+        <label>Sample ID:</label><input type="text" id="inTdrSample" style="width:110px;" />
+        <label><input type="checkbox" id="chkTdrWin" /> Filter Window [ns]:</label>
+        <input type="number" id="inTdrTmin" value="-2.0" step="0.5" style="width:70px;" />
+        <span>to</span>
+        <input type="number" id="inTdrTmax" value="8.0" step="0.5" style="width:70px;" />
+        <button class="btn" id="btnApplyTdrWin">Apply</button>
+        <button class="btn btn-blue" id="btnExportTdrXls" disabled>Export XLS Report</button>
+      </div>
+    </div>
+
+    <div class="grid-2-asym">
+      <div>
+        <div class="card">
+          <div class="card-title">TDR Impedance Advisory Summary (Informational)</div>
+          <div style="font-size:12.5px; line-height:1.9;">
+            <div><b>Minimum Impedance (Zmin):</b> <span id="lblTdrZmin" class="mono">---</span></div>
+            <div><b>Maximum Impedance (Zmax):</b> <span id="lblTdrZmax" class="mono">---</span></div>
+            <hr style="border:none; border-top:1px solid #E0E6EA;" />
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <b>ADVISORY STATUS:</b>
+              <span id="lblTdrStatus" class="verdict-pill">---</span>
+            </div>
+            <div style="font-size:11.5px; color:#666; font-style:italic; margin-top:6px;">
+              Informational check only — excursions outside 45–55 &Omega; are flagged as INFO, never hard FAIL.
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>TDR Analysis Log</span><button class="btn" onclick="clearLog('logTdr')">Clear Log</button></div>
+          <div class="log-box" id="logTdr" style="height:240px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">TDR Characteristic vs GMSL2 Specification</div>
+        <div style="height:430px;"><canvas id="chartTdr"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 7: POWER SUPPLY (PL303QMD-P VIA WEB SERIAL)                       -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-psu">
+    <div class="card">
+      <div class="card-title">PL303QMD-P Dual-Channel Power Supply (USB / RS-232 COM @ 9600 bps via Web Serial)</div>
+      <div class="form-row" style="margin-bottom:0;">
+        <button class="btn btn-primary" id="btnConnectPsu">Connect PSU (USB / COM)</button>
+        <button class="btn btn-red" id="btnDisconnectPsu" disabled>Disconnect PSU</button>
+        <button class="btn" id="btnPsuPollNow" disabled>Refresh Meters</button>
+        <button class="btn" id="btnPsuLocal" disabled>Return to LOCAL</button>
+        <span id="lblPsuIdn" class="mono" style="font-size:12px; color:#555;">ID: Not Connected</span>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Output 1 (CH1 — Camera A / Main Supply, 0–30 V / 0–3 A)</div>
+        <div class="psu-meter">
+          <div><div class="meter-lbl">MEASURED VOLTAGE</div><div class="meter-val-v" id="meterV1">0.000 V</div></div>
+          <div><div class="meter-lbl">MEASURED CURRENT</div><div class="meter-val-i" id="meterI1">0.0000 A</div></div>
+          <div><div class="meter-lbl">POWER</div><div class="meter-val-p" id="meterP1">0.00 W</div></div>
+          <div>
+            <div id="badgeOut1" class="badge err" style="margin-bottom:6px; text-align:center;">OUTPUT OFF</div>
+            <button class="btn btn-green" id="btnToggleCh1" disabled>Turn CH1 ON</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Set V [V]:</label><input type="number" id="inV1" value="12.000" step="0.1" style="width:85px;" />
+          <label>I Limit [A]:</label><input type="number" id="inI1" value="1.000" step="0.05" style="width:85px;" />
+          <label>OVP [V]:</label><input type="number" id="inOvp1" value="18.0" step="0.5" style="width:75px;" />
+          <label>OCP [A]:</label><input type="number" id="inOcp1" value="1.50" step="0.1" style="width:75px;" />
+          <button class="btn btn-blue" id="btnApplyCh1" disabled>Apply CH1</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Output 2 (CH2 — Camera B / Aux Supply, 0–30 V / 0–3 A)</div>
+        <div class="psu-meter">
+          <div><div class="meter-lbl">MEASURED VOLTAGE</div><div class="meter-val-v" id="meterV2">0.000 V</div></div>
+          <div><div class="meter-lbl">MEASURED CURRENT</div><div class="meter-val-i" id="meterI2">0.0000 A</div></div>
+          <div><div class="meter-lbl">POWER</div><div class="meter-val-p" id="meterP2">0.00 W</div></div>
+          <div>
+            <div id="badgeOut2" class="badge err" style="margin-bottom:6px; text-align:center;">OUTPUT OFF</div>
+            <button class="btn btn-green" id="btnToggleCh2" disabled>Turn CH2 ON</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Set V [V]:</label><input type="number" id="inV2" value="12.000" step="0.1" style="width:85px;" />
+          <label>I Limit [A]:</label><input type="number" id="inI2" value="1.000" step="0.05" style="width:85px;" />
+          <label>OVP [V]:</label><input type="number" id="inOvp2" value="18.0" step="0.5" style="width:75px;" />
+          <label>OCP [A]:</label><input type="number" id="inOcp2" value="1.50" step="0.1" style="width:75px;" />
+          <button class="btn btn-blue" id="btnApplyCh2" disabled>Apply CH2</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>PL303QMD-P Communication &amp; Telemetry Log</span><button class="btn" onclick="clearLog('logPsu')">Clear Log</button></div>
+      <div class="log-box" id="logPsu" style="height:200px;"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 8: AUTOMATIC TEST                                                 -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-auto">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">1. Test Selection &amp; Power Supply (PL303QMD-P) Settings</div>
+        <div class="form-row">
+          <label><input type="checkbox" id="chkAutoMargin" checked /> Link Margin (FWD + REV)</label>
+          <label><input type="checkbox" id="chkAutoEeprom" checked /> EEPROM (Read/Verify)</label>
+          <label><input type="checkbox" id="chkAutoErrb" checked /> ERRB Check</label>
+          <label><input type="checkbox" id="chkAutoCurrent" checked /> Current (Idle vs Stream)</label>
+        </div>
+        <div class="form-row" style="margin-bottom:0;">
+          <label>PSU Channel:</label>
+          <select id="selAutoPsuCh">
+            <option value="CH1">CH1</option>
+            <option value="CH2">CH2</option>
+            <option value="BOTH">BOTH (CH1 + CH2)</option>
+          </select>
+          <label>Test Voltages [V]:</label>
+          <input type="text" id="inAutoVolts" class="mono" value="10.0, 12.0" style="width:140px;" />
+          <label>I Limit [A]:</label>
+          <input type="number" id="inAutoIlim" value="1.0" step="0.1" style="width:65px;" />
+          <label>Dwell [s]:</label>
+          <select id="selAutoDwell"><option value="0.1">0.1</option><option value="0.5" selected>0.5</option><option value="1.0">1.0</option></select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2. Harness Metadata &amp; Sample Identification</div>
+        <div class="form-row">
+          <label>Cable Type:</label><input type="text" id="inAutoCableType" style="width:140px;" />
+          <label>Cable Length:</label><input type="text" id="inAutoCableLen" style="width:120px;" />
+        </div>
+        <div class="form-row" style="margin-bottom:0;">
+          <label>Sample ID (Port A):</label><input type="text" id="inAutoSampleA" value="Sample_A" style="width:130px;" />
+          <label>Sample ID (Port B):</label><input type="text" id="inAutoSampleB" value="Sample_B" style="width:130px;" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="form-row">
+        <button class="btn btn-primary" id="btnStartAuto">START AUTOMATIC TEST SEQUENCE</button>
+        <button class="btn btn-red" id="btnStopAuto" disabled>STOP</button>
+        <button class="btn btn-blue" id="btnExportAutoXls" disabled>Export Full XLS Report</button>
+        <span id="lblAutoStatus" style="font-weight:700; font-size:13px;">Status: Ready</span>
+      </div>
+      <progress id="progAuto" value="0" max="100"></progress>
+    </div>
+
+    <div class="grid-2-asym">
+      <div class="card">
+        <div class="card-title">Automatic Test Execution Log</div>
+        <div class="log-box" id="logAuto" style="height:280px;"></div>
+      </div>
+      <div class="card" style="overflow-x:auto;">
+        <div class="card-title">Automatic Test Matrix &amp; Results Summary</div>
+        <table class="data-tbl" id="tblAutoResults">
+          <thead>
+            <tr>
+              <th>Voltage</th><th>PSU CH</th><th>Port</th><th>Sample ID</th>
+              <th>Idle I</th><th>Stream I</th><th>FWD Margin</th><th>REV Margin</th>
+              <th>EEPROM</th><th>ERRB</th><th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 9: LONG-RUN SOAK TEST                                             -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-soak">
+    <div class="card">
+      <div class="card-title">Long-Run Soak Test Configuration (Continuous Current &amp; SerDes Error Monitoring)</div>
+      <div class="form-row" style="margin-bottom:0;">
+        <label>Target Camera(s):</label>
+        <select id="selSoakCam"><option value="PHYA ONLY">PHYA ONLY</option></select>
+        <label>PSU Channel:</label>
+        <select id="selSoakPsuCh"><option value="CH1">CH1</option><option value="CH2">CH2</option></select>
+        <label>Duration [min]:</label>
+        <input type="number" id="inSoakDurMin" value="5" min="0.1" step="0.5" style="width:75px;" />
+        <label>Poll Interval [s]:</label>
+        <select id="selSoakInterval"><option value="0.5">0.5</option><option value="1.0">1.0</option><option value="2.0" selected>2.0</option><option value="5.0">5.0</option></select>
+        <button class="btn btn-primary" id="btnStartSoak">START SOAK TEST</button>
+        <button class="btn btn-red" id="btnStopSoak" disabled>STOP</button>
+        <button class="btn btn-blue" id="btnExportSoakXls" disabled>Export Soak XLS Report</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid-4" style="font-size:13px;">
+        <div><b>Elapsed / Remaining:</b><div id="kpiSoakTime" class="mono">---</div></div>
+        <div><b>Link Lock Stability:</b><div id="kpiSoakLock" class="mono">---</div></div>
+        <div><b>Current (Min / Avg / Max):</b><div id="kpiSoakCurr" class="mono">---</div></div>
+        <div><b>Cumulative Errors:</b><div id="kpiSoakErr" class="mono">---</div></div>
+      </div>
+      <div style="margin-top:8px;"><progress id="progSoak" value="0" max="100"></progress></div>
+    </div>
+
+    <div class="grid-2-asym">
+      <div class="card">
+        <div class="card-title">Long-Run Soak Event &amp; Fault Log</div>
+        <div class="log-box" id="logSoak" style="height:280px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Real-Time Current [mA] &amp; Error Trend</div>
+        <div style="height:280px;"><canvas id="chartSoak"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TAB 10: I2C COMMUNICATION                                             -->
+  <!-- ===================================================================== -->
+  <div class="tab-panel" id="tab-i2c">
+    <div class="card">
+      <div class="card-title">Target Device &amp; I2C Addressing (EEPROM / Imager / Serializer / PMIC)</div>
+      <div class="form-row" style="margin-bottom:0;">
+        <label>Camera Port:</label><select id="selI2cCam"><option value="PHYA">PHYA</option></select>
+        <label>Device Type:</label>
+        <select id="selI2cDevType">
+          <option value="Serializer">Serializer</option>
+          <option value="Imager">Imager</option>
+          <option value="EEPROM">EEPROM</option>
+          <option value="PMIC">PMIC</option>
+          <option value="Deserializer">Deserializer (0x98)</option>
+        </select>
+        <label>I2C Address (hex):</label><input type="text" id="inI2cDevAddr" class="mono" value="0x80" style="width:75px;" />
+        <label>Register Width:</label>
+        <select id="selI2cWidth">
+          <option value="16">16-bit (WIB / RIB)</option>
+          <option value="8">8-bit (WB / RB)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-2-asym">
+      <div>
+        <div class="card">
+          <div class="card-title">1. Quick Register Read / Write</div>
+          <div class="form-row"><label style="width:160px;">Register Address (hex):</label><input type="text" id="inI2cReg" class="mono" value="0x0000" style="width:100px;" /></div>
+          <div class="form-row"><label style="width:160px;">Write Data (8-bit hex):</label><input type="text" id="inI2cVal" class="mono" value="0x00" style="width:100px;" /></div>
+          <div class="form-row"><label style="width:160px;">Read Byte Count:</label><input type="number" id="inI2cCnt" value="1" min="1" max="64" style="width:100px;" /></div>
+          <div class="form-row">
+            <button class="btn btn-blue" id="btnI2cQuickRead">READ REGISTER</button>
+            <button class="btn btn-green" id="btnI2cQuickWrite">WRITE REGISTER</button>
+          </div>
+          <div style="font-size:13px;"><b>Last Readback:</b> <span id="lblI2cLastRead" class="mono">---</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">2. Manual I2C Commands (CLI / ADI CSV / Multi-Line)</div>
+          <textarea id="txtI2cBatch" class="mono" rows="6" style="width:100%;">RIB 80 0000 1&#10;RIB 80 0013 1</textarea>
+          <div class="form-row" style="margin-top:8px; margin-bottom:0;">
+            <button class="btn btn-primary" id="btnSendI2cBatch">SEND MANUAL COMMANDS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>I2C Communication Console Log</span>
+          <button class="btn" onclick="clearLog('logI2c')">Clear Log</button>
+        </div>
+        <div class="log-box" id="logI2c" style="height:430px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================================================
+// GLOBAL STATE & LOGGING
+// =============================================================================
+const state = {
+  evkitPort: null,
+  evkitReader: null,
+  evkitWriter: null,
+  evkitLineBuf: "",
+  evkitLock: Promise.resolve(),
+
+  psuPort: null,
+  psuReader: null,
+  psuWriter: null,
+  psuLineBuf: "",
+  psuLock: Promise.resolve(),
+  psuConnected: false,
+  psuOut1: false,
+  psuOut2: false,
+
+  scriptText: "",
+  scriptName: "",
+  scriptInitialized: false,
+  detectedTopology: "DUAL",
+  lockA: false,
+  lockB: false,
+  serAddrMap: { PHYA: 0x80, PHYB: 0x82 },
+  eepAddrMap: { PHYA: 0x70, PHYB: 0x74 },
+  sensAddrMap: { PHYA: 0x40, PHYB: 0x44 },
+  serBaseMap: { PHYA: 0x1200, PHYB: 0x1200 },
+  eepromWpState: { PHYA: null, PHYB: null },
+
+  stopRequested: false,
+  lastMarginResults: null,
+  autoResults: [],
+  soakRecords: [],
+  sparamIl: null,
+  sparamRl: null,
+  tdrData: null,
+};
+
+const MIN_FWD_MARGIN_MV = 150;
+const MIN_REV_MARGIN_MV = 90;
+const DES_ADDR = 0x98;
+const SER_DEFAULT_ADDR = 0x80;
+const EEPROM_DEFAULT_ADDR = 0xA8;
+
+const CFG = {
+  PHYA: { adapt: 0x1403, r1445: 0x1445, revTx: 0x1495, decErr: 0x0022, pktErr: 0x2028 },
+  PHYB: { adapt: 0x1503, r1445: 0x1545, revTx: 0x1595, decErr: 0x0023, pktErr: 0x2128 },
+};
+
+const FWD_STEPS = (() => {
+  const arr = [];
+  for (let ampl = 410; ampl >= 10; ampl -= 10) {
+    let code = Math.round((ampl + 174.5) / 5.35);
+    if (code < 64) code = Math.max(0, code - 35);
+    const rep = ampl > 185 ? Math.trunc(0.568 * (ampl - 194.6) + 14.8) : 6;
+    const reg85 = Math.trunc(rep / 2) + 128;
+    const reg84 = 128 * (rep & 1);
+    arr.push({ code, reg85, reg84, ampl });
+  }
+  return arr;
+})();
+
+const REV_STEPS = (() => {
+  const arr = [];
+  for (let ampl = 250; ampl >= 10; ampl -= 10) {
+    const code = Math.trunc(ampl / 10);
+    const regVal = ampl === 250 ? 0x59 : (0xC0 | (code & 0x3F));
+    arr.push({ regVal, ampl });
+  }
+  return arr;
+})();
+
+const ERRB_GROUPS = [
+  ["GMSL_CORE0", 0x1023, 0x1024, [["DEC_ERR_OEN[0]", 0, 0], ["IDLE_ERR_OEN[0]", 4, 1], ["LOSS_OF_LOCK_OEN[0]", 5, 5]]],
+  ["GMSL_CORE7", 0x102B, 0x102C, [["RBB_CC_CRC_ERR_OEN[0]", 0, 0], ["GPIO_CRC_ERR_OEN[0]", 1, 1], ["INFOFR_CRC_ERR_OEN[0]", 2, 2], ["PTO_CRC_ERR_OEN[0]", 3, 3]]],
+  ["OV_INTR_CTRL", 0x0150, 0x0151, [["CAPVDD_OV_ERR_OEN[0]", 0, 0], ["VDD_OV_ERR_OEN[0]", 1, 1], ["VDD18_OV_ERR_OEN[0]", 2, 2]]],
+  ["UV_INTR_CTRL", 0x0152, 0x0153, [["CAPVDD_UV_ERR_OEN[0]", 0, 0], ["VDD_UV_ERR_OEN[0]", 1, 1], ["VDD18_UV_ERR_OEN[0]", 2, 2]]],
+  ["TMON_INTR_CTRL", 0x0160, 0x0161, [["TMON_RED_ERR_OEN[0]", 0, 0], ["TMON_YELLOW_ERR_OEN[0]", 1, 1]]],
+  ["RLMS_WR_EN_INTR", 0x0182, 0x0183, [["RLMS_WR_BLOCKED_ERR_OEN[0]", 0, 0]]],
+  ["ARQ_CFG0", 0x3003, 0x3007, [["MAX_RT_ERR_OEN[0]", 0, 7]]],
+  ["GPIO_AGGR_CFG6", 0x3020, 0x3022, [["AGGR_AND_ERR_FLAG_OEN[0]", 0, 0], ["AGGR_OR_ERR_FLAG_OEN[0]", 1, 1]]],
+  ["GPIO_AGGR_CTRL_0", 0x302A, 0x3031, [["GPIO_ERR_FLAG_EN[0]*", 1, 0]]],
+  ["GPIO_AGGR_CTRL_1", 0x3034, 0x303B, [["GPIO_ERR_FLAG_EN[0]*", 1, 0]]],
+  ["GPIO_AGGR_CTRL_2", 0x303E, 0x3045, [["GPIO_ERR_FLAG_EN[0]*", 1, 0]]],
+  ["GPIO_AGGR_CTRL_3", 0x3048, 0x304F, [["GPIO_ERR_FLAG_EN[0]*", 1, 0]]],
+  ["GPIO_AGGR_CTRL_4", 0x3052, 0x3059, [["GPIO_ERR_FLAG_EN[0]*", 1, 0]]],
+  ["GPIO_AGGR_CTRL_5", 0x305C, 0x3063, [["GPIO_ERR_FLAG_EN[0]*", 1, 0]]],
+  ["GPIO_AGGR_CTRL_6", 0x3066, 0x306D, [["GPIO_ERR_FLAG_EN[0]*", 1, 0]]],
+  ["REG_CRC_ERR_OEN", 0x3428, 0x3429, [["reg_crc_err_oen[0]*", 0, 0], ["reg_crc_disabled_oen[0]*", 1, 1]]],
+  ["EFUSE_INTR_CTRL", 0x9030, 0x9031, [["EFUSE_CRC_ERR_OEN[0]", 0, 0], ["EFUSE_TIMED_OUT_OEN[0]", 1, 1]]],
+  ["MIPI_RX4", 0xA010, 0xA011, [["INV_LINE_SEQ_D0_OEN[0]", 2, 2], ["INV_LINE_SEQ_D1_OEN[0]", 3, 3], ["INV_LINE_SEQ_CLK_OEN[0]", 4, 4]]],
+  ["MIPI_RX6", 0xA012, 0xA013, [["INV_LINE_SEQ_D2_OEN[0]", 2, 2], ["INV_LINE_SEQ_D3_OEN[0]", 3, 3]]],
+  ["MIPI_RX9", 0xA014, 0xA015, [["HS_SYNC_ERR1_D0", 0, 0], ["HS_SYNC_ERR1_D1", 1, 1], ["HS_SYNC_ERR_D0", 2, 2], ["HS_SYNC_ERR_D1", 3, 3], ["HS_CAL_FAIL_D0", 4, 4], ["HS_CAL_FAIL_D1", 5, 5]]],
+  ["MIPI_RX11", 0xA016, 0xA017, [["HS_SYNC_ERR1_D2", 0, 0], ["HS_SYNC_ERR1_D3", 1, 1], ["HS_SYNC_ERR_D2", 2, 2], ["HS_SYNC_ERR_D3", 3, 3], ["HS_CAL_FAIL_D2", 4, 4], ["HS_CAL_FAIL_D3", 5, 5]]],
+  ["CSI_RX_TUN_ERR", 0xA124, 0xA125, [["TUN_FIFO_OVERFLOW", 0, 0], ["HEADER_ERR", 1, 1], ["HEADER_ECC_ERR", 2, 2], ["PAYLOAD_CRC_ERR", 3, 3], ["PKT_INCOMPLETE", 4, 4], ["TUN_LOSS_PKTDET", 6, 6]]],
+];
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const hex2 = v => (v & 0xFF).toString(16).toUpperCase().padStart(2, "0");
+const hex4 = v => (v & 0xFFFF).toString(16).toUpperCase().padStart(4, "0");
+
+function appendLog(boxId, msg) {
+  const el = document.getElementById(boxId);
+  if (!el) return;
+  const ts = new Date().toTimeString().split(" ")[0];
+  el.textContent += `[${ts}] ${msg}\n`;
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog(boxId) {
+  const el = document.getElementById(boxId);
+  if (el) el.textContent = "";
+}
+
+// Check Web Serial availability on load
+if (!("serial" in navigator)) {
+  document.getElementById("webSerialWarn").style.display = "block";
+}
+
+// Tab switching
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
+});
+
+function syncAccessAndSelectors() {
+  const camUnlocked = state.scriptInitialized;
+  ["btnTabMargin", "btnTabEeprom", "btnTabErrb", "btnTabI2c"].forEach(id => {
+    document.getElementById(id).disabled = !camUnlocked;
+  });
+  document.getElementById("btnTabAuto").disabled = !state.psuConnected;
+  document.getElementById("btnTabSoak").disabled = !(camUnlocked || state.psuConnected);
+
+  const bOk = state.lockB;
+  const setOpts = (selId, opts) => {
+    const sel = document.getElementById(selId);
+    const prev = sel.value;
+    sel.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join("");
+    if (opts.includes(prev)) sel.value = prev;
+  };
+  setOpts("selMarginCam", bOk ? ["BOTH (PHYA + PHYB)", "PHYA ONLY", "PHYB ONLY"] : ["PHYA ONLY"]);
+  setOpts("selEepromCam", bOk ? ["PHYA", "PHYB"] : ["PHYA"]);
+  setOpts("selErrbCam", bOk ? ["PHYA", "PHYB"] : ["PHYA"]);
+  setOpts("selSoakCam", bOk ? ["BOTH (PHYA + PHYB)", "PHYA ONLY", "PHYB ONLY"] : ["PHYA ONLY"]);
+  setOpts("selI2cCam", bOk ? ["PHYA", "PHYB"] : ["PHYA"]);
+
+  const bA = document.getElementById("badgePortA");
+  bA.textContent = state.lockA ? "Port A: Link Lock OK" : "Port A: Link Lock NOT OK";
+  bA.className = "badge " + (state.lockA ? "ok" : "err");
+
+  const bB = document.getElementById("badgePortB");
+  bB.textContent = state.lockB ? "Port B: Link Lock OK" : "Port B: Link Lock NOT OK";
+  bB.className = "badge " + (state.lockB ? "ok" : "err");
+
+  document.getElementById("hdrTopology").textContent =
+    `Topology: ${state.detectedTopology} | PHYA Ser=0x${hex2(state.serAddrMap.PHYA)} (EEP 0x${hex2(state.eepAddrMap.PHYA)}) | PHYB Ser=0x${hex2(state.serAddrMap.PHYB)} (EEP 0x${hex2(state.eepAddrMap.PHYB)})`;
+}
+
+// =============================================================================
+// WEB SERIAL TRANSPORT (EVKIT @ 115200 & PSU @ 9600)
+// =============================================================================
+function withEvkitLock(fn) {
+  const next = state.evkitLock.then(fn, fn);
+  state.evkitLock = next.catch(() => {});
+  return next;
+}
+
+async function sendEvkitCmd(cmdClean, timeoutMs = 120) {
+  if (!state.evkitWriter || !state.evkitReader) throw new Error("EVKIT not connected");
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  await state.evkitWriter.write(enc.encode(cmdClean.trim() + "\r\n"));
+
+  const t0 = performance.now();
+  const lines = [];
+  while ((performance.now() - t0) < timeoutMs) {
+    let timer;
+    const readPromise = state.evkitReader.read();
+    const timeoutPromise = new Promise(res => { timer = setTimeout(() => res({ timeout: true }), 25); });
+    const res = await Promise.race([readPromise, timeoutPromise]);
+    clearTimeout(timer);
+    if (res.timeout) continue;
+    if (res.done) break;
+    state.evkitLineBuf += dec.decode(res.value, { stream: true });
+    let idx;
+    while ((idx = state.evkitLineBuf.indexOf("\n")) >= 0) {
+      const line = state.evkitLineBuf.slice(0, idx).replace(/\r/g, "").trim();
+      state.evkitLineBuf = state.evkitLineBuf.slice(idx + 1);
+      if (!line || line.toUpperCase() === cmdClean.trim().toUpperCase()) continue;
+      if (line.toUpperCase().includes("ERR") || line.toUpperCase().includes("NACK")) {
+        lines.push(line);
+        return lines.join(" ");
+      }
+      if (line.toUpperCase() === "OK" || line.toUpperCase().endsWith(" OK")) {
+        if (line.toUpperCase() !== "OK") lines.push(line.slice(0, -3).trim());
+        return lines.length ? lines.join(" ") : "OK";
+      }
+      lines.push(line);
+      if (lines.length >= 4) return lines.join(" ");
+    }
+  }
+  return lines.join(" ");
+}
+
+async function writeByte(dev, reg, val) {
+  const resp = await sendEvkitCmd(`WIB ${hex2(dev)} ${hex4(reg)} ${hex2(val)}`);
+  return resp.includes("OK") || !resp.includes("ERR");
+}
+
+async function readByte(dev, reg, timeoutMs = 120) {
+  const resp = await sendEvkitCmd(`RIB ${hex2(dev)} ${hex4(reg)} 1`, timeoutMs);
+  if (!resp || resp.toUpperCase().includes("ERR") || resp.toUpperCase().includes("NACK")) {
+    throw new Error(`I2C Error on ${hex2(dev)}:${hex4(reg)}: ${resp}`);
+  }
+  const toks = resp.split(/\s+/).filter(t => t.toUpperCase() !== "OK");
+  if (!toks.length) throw new Error(`No data on ${hex2(dev)}:${hex4(reg)}`);
+  return parseInt(toks[toks.length - 1].replace(/^0x/i, ""), 16);
+}
+
+async function isLocked(cam) {
+  try {
+    if (cam === "PHYA") {
+      const c3 = await readByte(DES_ADDR, 0x0013);
+      return (c3 & 0x08) !== 0;
+    } else {
+      const c3 = await readByte(state.serAddrMap.PHYB, 0x0013);
+      return (c3 & 0x08) !== 0;
+    }
+  } catch {
+    return false;
+  }
+}
+
+document.getElementById("btnConnectEvkit").addEventListener("click", async () => {
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    state.evkitPort = port;
+    state.evkitWriter = port.writable.getWriter();
+    state.evkitReader = port.readable.getReader();
+    document.getElementById("btnConnectEvkit").disabled = true;
+    document.getElementById("btnDisconnectEvkit").disabled = false;
+    document.getElementById("btnPollLocks").disabled = false;
+    document.getElementById("lblEvkitPortStatus").textContent = "Status: Connected to EVKIT (115200 bps)";
+    document.getElementById("lblEvkitPortStatus").style.color = "#007E33";
+    appendLog("logConn", "Connected to EVKIT USB/COM port @ 115200 bps.");
+    await pollLocksNow();
+  } catch (e) {
+    appendLog("logConn", `EVKIT connection error: ${e.message}`);
+  }
+});
+
+document.getElementById("btnDisconnectEvkit").addEventListener("click", async () => {
+  try {
+    if (state.evkitReader) { await state.evkitReader.cancel(); state.evkitReader.releaseLock(); }
+    if (state.evkitWriter) { state.evkitWriter.releaseLock(); }
+    if (state.evkitPort) { await state.evkitPort.close(); }
+  } catch {}
+  state.evkitPort = state.evkitReader = state.evkitWriter = null;
+  state.lockA = state.lockB = false;
+  document.getElementById("btnConnectEvkit").disabled = false;
+  document.getElementById("btnDisconnectEvkit").disabled = true;
+  document.getElementById("btnPollLocks").disabled = true;
+  document.getElementById("lblEvkitPortStatus").textContent = "Status: Disconnected";
+  document.getElementById("lblEvkitPortStatus").style.color = "#5A6B75";
+  syncAccessAndSelectors();
+  appendLog("logConn", "Disconnected EVKIT port.");
+});
+
+async function pollLocksNow() {
+  if (!state.evkitPort) return;
+  await withEvkitLock(async () => {
+    state.lockA = await isLocked("PHYA");
+    state.lockB = await isLocked("PHYB");
+  });
+  syncAccessAndSelectors();
+  appendLog("logConn", `Lock Status -> Port A: ${state.lockA ? "LOCKED" : "UNLOCKED"} | Port B: ${state.lockB ? "LOCKED" : "UNLOCKED"}`);
+}
+document.getElementById("btnPollLocks").addEventListener("click", pollLocksNow);
+
+// =============================================================================
+// SCRIPT PARSER & INIT SCRIPT EXECUTION
+// =============================================================================
+function parseScriptLine(rawLine) {
+  let line = rawLine.trim();
+  if (!line || line.startsWith("#") || line.startsWith("//") || line.startsWith(";")) return null;
+  for (const cmt of ["//", "#", ";"]) {
+    if (line.includes(cmt)) line = line.split(cmt)[0].trim();
+  }
+  if (!line) return null;
+
+  const first = line.split(/[\s,()]+/)[0].toUpperCase();
+  if (["WAIT", "DELAY", "SLEEP"].includes(first)) {
+    const parts = line.split(/[\s,()]+/).filter(Boolean);
+    for (let i = 1; i < parts.length; i++) {
+      const ms = parseFloat(parts[i]);
+      if (!isNaN(ms)) return { kind: "DELAY", ms };
+    }
+    return null;
+  }
+
+  if (line.includes(",")) {
+    const parts = line.split(",").map(s => s.trim()).filter(Boolean);
+    const hexVals = parts.map(p => parseInt(p.replace(/^0x/i, ""), 16));
+    if (hexVals.some(v => isNaN(v))) return null;
+    if (hexVals.length === 2 && hexVals[0] === 0x00) return { kind: "DELAY", ms: hexVals[1] };
+    if (hexVals.length >= 5 && (hexVals[0] === 0x04 || hexVals[0] === 0x00)) {
+      const dev = hexVals[1], reg = (hexVals[2] << 8) | hexVals[3], val = hexVals[4];
+      return { kind: "WRITE", dev, reg, val, cmd: `WIB ${hex2(dev)} ${hex4(reg)} ${hex2(val)}` };
+    }
+    if (hexVals.length === 4) {
+      const dev = hexVals[0], reg = (hexVals[1] << 8) | hexVals[2], val = hexVals[3];
+      return { kind: "WRITE", dev, reg, val, cmd: `WIB ${hex2(dev)} ${hex4(reg)} ${hex2(val)}` };
+    }
+    return null;
+  }
+
+  const tokens = line.split(/\s+/);
+  const up = tokens[0].toUpperCase();
+  if (["WB", "WIB", "WIK"].includes(up)) {
+    const rest = tokens.slice(1).map(t => t.replace(/^0x/i, ""));
+    const nums = rest.map(t => parseInt(t, 16));
+    if (nums.length >= 3 && !nums.slice(0, 3).some(isNaN)) {
+      return { kind: "WRITE", dev: nums[0], reg: nums[1], val: nums[2], cmd: `${up} ${rest.join(" ")}` };
+    }
+    return { kind: "RAW", cmd: `${up} ${rest.join(" ")}` };
+  }
+  if (["RIB", "RIK", "RB"].includes(up)) {
+    return { kind: "RAW", cmd: `${up} ${tokens.slice(1).map(t => t.replace(/^0x/i, "")).join(" ")}` };
+  }
+  return { kind: "RAW", cmd: line };
+}
+
+function analyzeScriptTopology(text) {
+  const isValidSer = a => a >= 0x80 && a <= 0x8E && (a & 1) === 0;
+  const reassignments = [], eepTrans = {}, sensTrans = {}, linkMasks = [], seenSers = [];
+  let curLink = null;
+  const linkToSer = {};
+
+  for (const rl of text.split(/\r?\n/)) {
+    const p = parseScriptLine(rl);
+    if (!p || p.kind !== "WRITE") continue;
+    if (p.dev === DES_ADDR && (p.reg === 0x0F00 || p.reg === 0x0010)) {
+      const m = p.val & 0x03;
+      if (p.reg === 0x0F00 || m !== 0) {
+        linkMasks.push(m);
+        if (m === 1) curLink = "PHYA";
+        else if (m === 2) curLink = "PHYB";
+        else if (m === 3) curLink = "BOTH";
+      }
+    } else if (p.reg === 0x0000 && isValidSer(p.dev)) {
+      const na = p.val & 0xFE;
+      if (isValidSer(na) && na !== p.dev) {
+        reassignments.push([p.dev, na]);
+        if (curLink === "PHYA" || curLink === "PHYB") linkToSer[curLink] = na;
+      }
+    } else if ((p.reg === 0x351C || p.reg === 0x0042) && isValidSer(p.dev)) {
+      if ((p.val & 0xFE) >= 0x10) eepTrans[p.dev] = p.val & 0xFE;
+    } else if ((p.reg === 0x351A || p.reg === 0x0044) && isValidSer(p.dev)) {
+      if ((p.val & 0xFE) >= 0x10) sensTrans[p.dev] = p.val & 0xFE;
+    }
+    if (isValidSer(p.dev) && !seenSers.includes(p.dev)) seenSers.push(p.dev);
+  }
+
+  let activeSers = [...new Set([...seenSers, ...reassignments.map(r => r[1])])];
+  if (reassignments.length === 1 && !linkMasks.includes(3) && !(linkMasks.includes(1) && linkMasks.includes(2))) {
+    activeSers = [reassignments[0][1]];
+  }
+  const isDual = activeSers.length >= 2 || linkMasks.includes(3) || (linkMasks.includes(1) && linkMasks.includes(2));
+  if (isDual) {
+    state.detectedTopology = "DUAL";
+    const phyb = linkToSer.PHYB || activeSers[1] || 0x82;
+    const phya = linkToSer.PHYA || activeSers.find(a => a !== phyb) || 0x80;
+    state.serAddrMap.PHYA = phya;
+    state.serAddrMap.PHYB = phyb;
+    state.eepAddrMap.PHYA = eepTrans[phya] || EEPROM_DEFAULT_ADDR;
+    state.eepAddrMap.PHYB = eepTrans[phyb] || EEPROM_DEFAULT_ADDR;
+    if (sensTrans[phya]) state.sensAddrMap.PHYA = sensTrans[phya];
+    if (sensTrans[phyb]) state.sensAddrMap.PHYB = sensTrans[phyb];
+  } else {
+    const onlyB = linkMasks.includes(2) && !linkMasks.includes(1) && !linkMasks.includes(3);
+    const sAddr = activeSers[0] || SER_DEFAULT_ADDR;
+    const eAddr = eepTrans[sAddr] || EEPROM_DEFAULT_ADDR;
+    state.detectedTopology = onlyB ? "SINGLE_PHYB" : "SINGLE_PHYA";
+    if (onlyB) { state.serAddrMap.PHYB = sAddr; state.eepAddrMap.PHYB = eAddr; }
+    else { state.serAddrMap.PHYA = sAddr; state.eepAddrMap.PHYA = eAddr; }
+  }
+}
+
+document.getElementById("fileInitScript").addEventListener("change", async ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  state.scriptName = f.name;
+  state.scriptText = await f.text();
+  analyzeScriptTopology(state.scriptText);
+  document.getElementById("lblScriptSummary").textContent =
+    `Loaded: ${f.name} -> Topology: ${state.detectedTopology} (PHYA=0x${hex2(state.serAddrMap.PHYA)} / EEP 0x${hex2(state.eepAddrMap.PHYA)}, PHYB=0x${hex2(state.serAddrMap.PHYB)} / EEP 0x${hex2(state.eepAddrMap.PHYB)})`;
+  appendLog("logConn", `Loaded script '${f.name}' -> Auto-Detected ${state.detectedTopology}`);
+  syncAccessAndSelectors();
+});
+
+async function runInitScript(turbo = true) {
+  if (!state.evkitPort) throw new Error("Connect EVKIT USB/COM port first!");
+  if (!state.scriptText) throw new Error("Upload a camera init script (.txt) first!");
+  const lines = state.scriptText.split(/\r?\n/);
+
+  await withEvkitLock(async () => {
+    const t0 = performance.now();
+    if (turbo) {
+      const enc = new TextEncoder();
+      let chunk = "";
+      let count = 0;
+      for (const rl of lines) {
+        const p = parseScriptLine(rl);
+        if (!p) continue;
+        if (p.kind === "DELAY") {
+          if (chunk) { await state.evkitWriter.write(enc.encode(chunk)); chunk = ""; }
+          await sleep(p.ms);
+          continue;
+        }
+        chunk += p.cmd + "\r\n";
+        count++;
+        if (chunk.length > 1024) {
+          await state.evkitWriter.write(enc.encode(chunk));
+          chunk = "";
+          await sleep(2);
+        }
+      }
+      if (chunk) await state.evkitWriter.write(enc.encode(chunk));
+      await sleep(300);
+      appendLog("logConn", `[TURBO MODE] Sent ${count} commands in ${((performance.now() - t0) / 1000).toFixed(3)} s.`);
+    } else {
+      let ok = 0, err = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const p = parseScriptLine(lines[i]);
+        if (!p) continue;
+        if (p.kind === "DELAY") { await sleep(p.ms); continue; }
+        const resp = await sendEvkitCmd(p.cmd);
+        if (!resp || resp.includes("ERR")) { err++; appendLog("logConn", `[L${i+1}] ERR: ${p.cmd} -> ${resp}`); }
+        else ok++;
+      }
+      appendLog("logConn", `[STANDARD MODE] Finished: ${ok} OK, ${err} Errors.`);
+    }
+
+    for (let attempt = 0; attempt < 20; attempt++) {
+      state.lockA = await isLocked("PHYA");
+      state.lockB = await isLocked("PHYB");
+      if (state.detectedTopology === "DUAL" && state.lockA && state.lockB) break;
+      if (state.detectedTopology !== "DUAL" && (state.lockA || state.lockB)) break;
+      await sleep(100);
+    }
+    state.scriptInitialized = true;
+  });
+  syncAccessAndSelectors();
+}
+
+document.getElementById("btnSendScript").addEventListener("click", async () => {
+  try {
+    const turbo = document.getElementById("chkTurboInit").checked;
+    await runInitScript(turbo);
+    appendLog("logConn", `Init finished -> Port A Lock=${state.lockA} | Port B Lock=${state.lockB}`);
+  } catch (e) {
+    alert(e.message);
+  }
+});
+
+// =============================================================================
+// LINK MARGIN CHART & SWEEP EXECUTION
+// =============================================================================
+const chartMargin = new Chart(document.getElementById("chartMargin"), {
+  type: "bar",
+  data: {
+    labels: ["PHYA (REV) Des", "PHYA (FWD) Ser", "PHYB (REV) Des", "PHYB (FWD) Ser"],
+    datasets: [
+      { label: "Fail", data: [0, 0, 0, 0], backgroundColor: "#F20000" },
+      { label: "Pass", data: [0, 0, 0, 0], backgroundColor: "#008000" },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true, min: 0, max: 600, title: { display: true, text: "TX Amplitude (mV)" } }
+    }
+  }
+});
+
+function updateMarginBar(cam, dir, failVal, passVal) {
+  const idx = (cam === "PHYA" ? 0 : 2) + (dir === "REV" ? 0 : 1);
+  chartMargin.data.datasets[0].data[idx] = failVal || 0;
+  chartMargin.data.datasets[1].data[idx] = passVal || 0;
+  chartMargin.update("none");
+}
+
+document.getElementById("btnStopMargin").addEventListener("click", () => { state.stopRequested = true; });
+
+document.getElementById("btnStartMargin").addEventListener("click", async () => {
+  if (!state.evkitPort) return alert("Connect EVKIT first!");
+  state.stopRequested = false;
+  document.getElementById("btnStartMargin").disabled = true;
+  document.getElementById("btnStopMargin").disabled = false;
+  document.getElementById("btnExportMarginXls").disabled = true;
+
+  chartMargin.data.datasets[0].data = [0, 0, 0, 0];
+  chartMargin.data.datasets[1].data = [0, 0, 0, 0];
+  chartMargin.update();
+
+  const camMode = document.getElementById("selMarginCam").value;
+  const dirMode = document.getElementById("selMarginDir").value;
+  const dwellMs = parseFloat(document.getElementById("selMarginDwell").value) * 1000;
+  const cams = camMode.includes("BOTH") ? ["PHYA", "PHYB"] : (camMode.includes("PHYA") ? ["PHYA"] : ["PHYB"]);
+  const runFwd = dirMode.includes("FWD") || dirMode.includes("BOTH");
+  const runRev = dirMode.includes("REV") || dirMode.includes("BOTH");
+
+  const results = {
+    PHYA: { fwdDelta: null, fwdStatus: "N/A", revDelta: null, revStatus: "N/A", fwdRows: [], revRows: [] },
+    PHYB: { fwdDelta: null, fwdStatus: "N/A", revDelta: null, revStatus: "N/A", fwdRows: [], revRows: [] },
+    overall: "FAIL",
+    timestamp: new Date().toISOString().replace("T", " ").slice(0, 19),
+    harnessLen: document.getElementById("inHarnessLen").value,
+    harnessType: document.getElementById("inHarnessType").value,
+    voltageLvl: document.getElementById("inVoltageLvl").value,
+  };
+
+  try {
+    for (const cam of cams) {
+      if (state.stopRequested) break;
+      const serAddr = state.serAddrMap[cam];
+      const cfg = CFG[cam];
+      const sBase = 0x1200;
+
+      if (runFwd && !state.stopRequested) {
+        appendLog("logMargin", `[${cam}] START FWD Link Margin Sweep (410 -> 10 mV)...`);
+        let snap = {};
+        await withEvkitLock(async () => {
+          await writeByte(serAddr, 0x0180, 0xBA);
+          await writeByte(serAddr, 0x0181, 0xDC);
+          for (const off of [0xC8, 0x85, 0x84, 0xCE, 0xBA]) {
+            try { snap[off] = await readByte(serAddr, sBase + off); } catch {}
+          }
+          await writeByte(serAddr, sBase + 0xC9, 0x00);
+          await writeByte(serAddr, sBase + 0xCA, 0x00);
+          await writeByte(serAddr, sBase + 0xCE, 0x3E);
+          await writeByte(serAddr, sBase + 0xBA, 0x08);
+        });
+
+        let failAmpl = null;
+        for (let i = 0; i < FWD_STEPS.length; i++) {
+          if (state.stopRequested) break;
+          const st = FWD_STEPS[i];
+          document.getElementById("lblMarginStep").textContent = `${cam} FWD: ${st.ampl} mV (Step ${i+1}/${FWD_STEPS.length})`;
+          document.getElementById("progMargin").value = Math.round(((i + 1) / FWD_STEPS.length) * 50);
+          updateMarginBar(cam, "FWD", st.ampl, 410 - st.ampl);
+
+          const t0 = performance.now();
+          let stepFail = false;
+          await withEvkitLock(async () => {
+            try {
+              await writeByte(serAddr, sBase + 0xC8, st.code);
+              await writeByte(serAddr, sBase + 0x85, st.reg85);
+              await writeByte(serAddr, sBase + 0x84, st.reg84);
+              await writeByte(DES_ADDR, cfg.adapt, 0x8A);
+              await sleep(100);
+              await writeByte(DES_ADDR, cfg.adapt, 0x0A);
+              if (!(await isLocked(cam))) stepFail = true;
+              else { try { await readByte(DES_ADDR, cfg.decErr); } catch {} }
+            } catch { stepFail = true; }
+          });
+
+          if (stepFail) {
+            failAmpl = st.ampl;
+            results[cam].fwdRows.push([i + 1, st.ampl, "NO_LOCK", "FAIL"]);
+            appendLog("logMargin", `[${cam}] FWD ${st.ampl} mV -> FAIL (Lock Lost)`);
+            break;
+          }
+
+          const rem = dwellMs - (performance.now() - t0);
+          if (rem > 0) await sleep(rem);
+
+          let errCnt = 0;
+          await withEvkitLock(async () => {
+            if (!(await isLocked(cam))) errCnt = 9999;
+            else errCnt = await readByte(DES_ADDR, cfg.decErr);
+          });
+
+          if (errCnt > 0) {
+            failAmpl = st.ampl;
+            results[cam].fwdRows.push([i + 1, st.ampl, errCnt, "FAIL"]);
+            appendLog("logMargin", `[${cam}] FWD ${st.ampl} mV -> FAIL (Err=${errCnt})`);
+            break;
+          } else {
+            results[cam].fwdRows.push([i + 1, st.ampl, 0, "PASS"]);
+          }
+        }
+
+        // Recover after FWD
+        await withEvkitLock(async () => {
+          try { await writeByte(serAddr, 0x0010, 0x80); } catch {}
+          await sleep(80);
+          try {
+            await writeByte(serAddr, 0x0180, 0xBA);
+            await writeByte(serAddr, 0x0181, 0xDC);
+            await writeByte(serAddr, sBase + 0xC8, snap[0xC8] ?? 0x6D);
+            await writeByte(serAddr, sBase + 0xCE, snap[0xCE] ?? 0x19);
+            await writeByte(serAddr, sBase + 0x84, snap[0x84] ?? 0x00);
+            await writeByte(serAddr, sBase + 0x85, snap[0x85] ?? 0xBC);
+            await writeByte(DES_ADDR, cfg.adapt, 0x8A);
+            await sleep(80);
+            await writeByte(DES_ADDR, cfg.adapt, 0x0A);
+          } catch {}
+        });
+
+        const delta = failAmpl !== null ? (410 - failAmpl) : 400;
+        const ok = delta >= MIN_FWD_MARGIN_MV;
+        results[cam].fwdDelta = delta;
+        results[cam].fwdStatus = ok ? "PASS" : "FAIL";
+        updateMarginBar(cam, "FWD", failAmpl || 0, failAmpl ? delta : 410);
+        document.getElementById(cam === "PHYA" ? "resPhyaFwd" : "resPhybFwd").innerHTML =
+          `<b style="color:${ok ? '#007E33' : '#B81D13'}">${delta} mV -> ${results[cam].fwdStatus}</b>`;
+      }
+
+      if (runRev && !state.stopRequested) {
+        appendLog("logMargin", `[${cam}] START REV Link Margin Sweep (250 -> 10 mV)...`);
+        await withEvkitLock(async () => {
+          await writeByte(DES_ADDR, cfg.revTx, 0x59);
+          await writeByte(serAddr, 0x0180, 0xBA);
+          await writeByte(serAddr, 0x0181, 0xDC);
+          await writeByte(serAddr, sBase + 0x03, 0x8A);
+          await sleep(50);
+          await writeByte(serAddr, sBase + 0x03, 0x0A);
+          await writeByte(serAddr, sBase + 0x1F, 0x00);
+          const v2e = await readByte(serAddr, sBase + 0x2E);
+          await writeByte(serAddr, sBase + 0x33, v2e);
+          await writeByte(serAddr, sBase + 0x57, 0x01);
+          await writeByte(serAddr, sBase + 0x03, 0x8A);
+          await sleep(50);
+          await writeByte(serAddr, sBase + 0x03, 0x0A);
+          try { await readByte(serAddr, 0x1025); } catch {}
+        });
+
+        let failRev = null;
+        for (let i = 0; i < REV_STEPS.length; i++) {
+          if (state.stopRequested) break;
+          const st = REV_STEPS[i];
+          document.getElementById("lblMarginStep").textContent = `${cam} REV: ${st.ampl} mV (Step ${i+1}/${REV_STEPS.length})`;
+          document.getElementById("progMargin").value = 50 + Math.round(((i + 1) / REV_STEPS.length) * 50);
+          updateMarginBar(cam, "REV", st.ampl, 250 - st.ampl);
+
+          const t0 = performance.now();
+          let stepFail = false;
+          await withEvkitLock(async () => {
+            try {
+              await writeByte(DES_ADDR, cfg.revTx, st.regVal);
+              await writeByte(serAddr, sBase + 0x03, 0x8A);
+              await sleep(80);
+              await writeByte(serAddr, sBase + 0x03, 0x0A);
+              if (!(await isLocked(cam))) stepFail = true;
+              else {
+                await writeByte(serAddr, 0x1025, 0x01);
+                await readByte(serAddr, 0x1025);
+              }
+            } catch { stepFail = true; }
+          });
+
+          if (stepFail) {
+            failRev = st.ampl;
+            results[cam].revRows.push([i + 1, st.ampl, "NO_LOCK", "FAIL"]);
+            appendLog("logMargin", `[${cam}] REV ${st.ampl} mV -> FAIL (No Lock)`);
+            break;
+          }
+
+          const rem = dwellMs - (performance.now() - t0);
+          if (rem > 0) await sleep(rem);
+
+          let revErr = 0;
+          await withEvkitLock(async () => {
+            try {
+              if (!(await isLocked(cam))) revErr = 9999;
+              else revErr = await readByte(serAddr, 0x1025);
+            } catch { revErr = 9999; }
+          });
+
+          if (revErr > 0) {
+            failRev = st.ampl;
+            results[cam].revRows.push([i + 1, st.ampl, revErr, "FAIL"]);
+            appendLog("logMargin", `[${cam}] REV ${st.ampl} mV -> FAIL (RevErr=${revErr})`);
+            break;
+          } else {
+            results[cam].revRows.push([i + 1, st.ampl, 0, "PASS"]);
+          }
+        }
+
+        const revDelta = failRev !== null ? (250 - failRev) : 240;
+        const ok = revDelta >= MIN_REV_MARGIN_MV;
+        results[cam].revDelta = revDelta;
+        results[cam].revStatus = ok ? "PASS" : "FAIL";
+        updateMarginBar(cam, "REV", failRev || 0, failRev ? revDelta : 250);
+        document.getElementById(cam === "PHYA" ? "resPhyaRev" : "resPhybRev").innerHTML =
+          `<b style="color:${ok ? '#007E33' : '#B81D13'}">${revDelta} mV -> ${results[cam].revStatus}</b>`;
+      }
+    }
+
+    if (state.scriptText) await runInitScript(true);
+
+    let overall = true;
+    for (const c of cams) {
+      if (runFwd && results[c].fwdStatus !== "PASS") overall = false;
+      if (runRev && results[c].revStatus !== "PASS") overall = false;
+    }
+    results.overall = overall ? "PASS" : "FAIL";
+    state.lastMarginResults = results;
+
+    const pill = document.getElementById("resMarginOverall");
+    pill.textContent = overall ? "PASS (COMPLIANT)" : "FAIL (NON-COMPLIANT)";
+    pill.className = "verdict-pill " + (overall ? "verdict-pass" : "verdict-fail");
+    document.getElementById("lblMarginStatus").textContent = "Status: Measurements finished.";
+    document.getElementById("btnExportMarginXls").disabled = false;
+  } finally {
+    document.getElementById("btnStartMargin").disabled = false;
+    document.getElementById("btnStopMargin").disabled = true;
+  }
+});
+
+document.getElementById("btnExportMarginXls").addEventListener("click", () => {
+  const r = state.lastMarginResults;
+  if (!r || typeof XLSX === "undefined") return;
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    ["VALEO AUTOMOTIVE - GMSL2 PULSE LINK MARGIN REPORT"],
+    ["Timestamp", r.timestamp, "Topology", state.detectedTopology],
+    ["Harness Length", r.harnessLen || "N/A", "Harness Type", r.harnessType || "N/A", "Voltage", r.voltageLvl || "N/A"],
+    ["Final Verdict", r.overall],
+    [],
+    ["Camera / Channel", "Delta Margin [mV]", "Minimum Spec [mV]", "Status"],
+    ["PHYA - FWD", r.PHYA.fwdDelta ?? "N/A", MIN_FWD_MARGIN_MV, r.PHYA.fwdStatus],
+    ["PHYA - REV", r.PHYA.revDelta ?? "N/A", MIN_REV_MARGIN_MV, r.PHYA.revStatus],
+    ["PHYB - FWD", r.PHYB.fwdDelta ?? "N/A", MIN_FWD_MARGIN_MV, r.PHYB.fwdStatus],
+    ["PHYB - REV", r.PHYB.revDelta ?? "N/A", MIN_REV_MARGIN_MV, r.PHYB.revStatus],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Summary");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Step", "Amplitude [mV]", "Errors", "Status"], ...r.PHYA.fwdRows]), "PHYA_FWD");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Step", "Amplitude [mV]", "Errors", "Status"], ...r.PHYA.revRows]), "PHYA_REV");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Step", "Amplitude [mV]", "Errors", "Status"], ...r.PHYB.fwdRows]), "PHYB_FWD");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Step", "Amplitude [mV]", "Errors", "Status"], ...r.PHYB.revRows]), "PHYB_REV");
+  XLSX.writeFile(wb, `Valeo_GMSL2_Pulse_Report_${Date.now()}.xlsx`);
+});
+
+// =============================================================================
+// EEPROM TAB LOGIC
+// =============================================================================
+function refreshEepromUi() {
+  const cam = document.getElementById("selEepromCam").value;
+  const serA = state.serAddrMap[cam];
+  const eepA = state.eepAddrMap[cam];
+  document.getElementById("inEepromAddr").value = "0x" + hex2(eepA);
+  document.getElementById("lblEepromCamHdr").textContent = `Selected Camera: ${cam} (Serializer 0x${hex2(serA)})`;
+  const wp = state.eepromWpState[cam];
+  document.getElementById("ledWpDisabled").className = "led " + (wp === false ? "led-green" : "led-gray");
+  document.getElementById("ledWpEnabled").className = "led " + (wp === true ? "led-red" : "led-gray");
+  document.getElementById("btnEepromWriteVerify").disabled = (wp !== false);
+  document.getElementById("btnEepromReadOnly").disabled = (wp !== false);
+}
+document.getElementById("selEepromCam").addEventListener("change", refreshEepromUi);
+
+async function setEepromWp(enable) {
+  const cam = document.getElementById("selEepromCam").value;
+  const serA = state.serAddrMap[cam];
+  const wpReg = parseInt(document.getElementById("inEepromWpReg").value, 16);
+  const wpOn = parseInt(document.getElementById("inWpOnVal").value, 16);
+  const wpOff = parseInt(document.getElementById("inWpOffVal").value, 16);
+  const target = enable ? wpOn : wpOff;
+  await withEvkitLock(async () => {
+    await writeByte(serA, wpReg, target);
+    await sleep(20);
+    const rb = await readByte(serA, wpReg);
+    state.eepromWpState[cam] = (rb === wpOn) ? true : (rb === wpOff ? false : null);
+    appendLog("logEeprom", `[${cam}] WP ${enable ? "ENABLED" : "DISABLED"} -> Reg 0x${hex4(wpReg)} = 0x${hex2(rb)}`);
+  });
+  refreshEepromUi();
+}
+document.getElementById("btnWpDisable").addEventListener("click", () => setEepromWp(false));
+document.getElementById("btnWpEnable").addEventListener("click", () => setEepromWp(true));
+document.getElementById("btnWpRead").addEventListener("click", async () => {
+  const cam = document.getElementById("selEepromCam").value;
+  const serA = state.serAddrMap[cam];
+  const wpReg = parseInt(document.getElementById("inEepromWpReg").value, 16);
+  const wpOn = parseInt(document.getElementById("inWpOnVal").value, 16);
+  const wpOff = parseInt(document.getElementById("inWpOffVal").value, 16);
+  await withEvkitLock(async () => {
+    const rb = await readByte(serA, wpReg);
+    state.eepromWpState[cam] = (rb === wpOn) ? true : (rb === wpOff ? false : null);
+    appendLog("logEeprom", `[${cam}] Read WP Reg 0x${hex4(wpReg)} -> 0x${hex2(rb)}`);
+  });
+  refreshEepromUi();
+});
+
+document.getElementById("btnEepromWriteVerify").addEventListener("click", async () => {
+  const cam = document.getElementById("selEepromCam").value;
+  const serA = state.serAddrMap[cam];
+  const eepA = parseInt(document.getElementById("inEepromAddr").value, 16);
+  const regA = parseInt(document.getElementById("inEepromReg").value, 16);
+  const rawHex = document.getElementById("inEepromVal").value.trim().replace(/^0x/i, "");
+  const expVal = parseInt(rawHex, 16);
+  const bytes = rawHex.length <= 2 ? [expVal & 0xFF] : [(expVal >> 8) & 0xFF, expVal & 0xFF];
+
+  await withEvkitLock(async () => {
+    await writeByte(serA, 0x351C, eepA);
+    await writeByte(serA, 0x351D, EEPROM_DEFAULT_ADDR);
+    await writeByte(serA, 0x0042, eepA);
+    await writeByte(serA, 0x0043, EEPROM_DEFAULT_ADDR);
+    const rbBytes = [];
+    for (let i = 0; i < bytes.length; i++) {
+      await sendEvkitCmd(`WB ${hex2(eepA)} ${hex2((regA + i) & 0xFF)} ${hex2(bytes[i])}`);
+      await sleep(15);
+      const resp = await sendEvkitCmd(`RB ${hex2(eepA)} ${hex2((regA + i) & 0xFF)} 1`);
+      const tok = resp.split(/\s+/).filter(t => t.toUpperCase() !== "OK").pop();
+      rbBytes.push(parseInt(tok.replace(/^0x/i, ""), 16));
+    }
+    const actVal = rbBytes.length === 1 ? rbBytes[0] : ((rbBytes[0] << 8) | rbBytes[1]);
+    const pass = actVal === expVal;
+    const lbl = document.getElementById("lblEepromVerify");
+    lbl.textContent = pass ? `PASS (0x${actVal.toString(16).toUpperCase()})` : `FAIL (Read 0x${actVal.toString(16).toUpperCase()})`;
+    lbl.style.color = pass ? "#007E33" : "#B71C1C";
+    appendLog("logEeprom", `[${cam}] EEPROM Write & Verify @ 0x${hex2(regA)} -> ${lbl.textContent}`);
+  });
+});
+
+document.getElementById("btnEepromReadOnly").addEventListener("click", async () => {
+  const cam = document.getElementById("selEepromCam").value;
+  const serA = state.serAddrMap[cam];
+  const eepA = parseInt(document.getElementById("inEepromAddr").value, 16);
+  const regA = parseInt(document.getElementById("inEepromReg").value, 16);
+  await withEvkitLock(async () => {
+    await writeByte(serA, 0x351C, eepA);
+    await writeByte(serA, 0x351D, EEPROM_DEFAULT_ADDR);
+    const resp = await sendEvkitCmd(`RB ${hex2(eepA)} ${hex2(regA)} 1`);
+    document.getElementById("lblEepromVerify").textContent = `READ: ${resp}`;
+    appendLog("logEeprom", `[${cam}] Read 0x${hex2(eepA)}:0x${hex2(regA)} -> ${resp}`);
+  });
+});
+
+// =============================================================================
+// ERRB MONITOR GRID & POLLING
+// =============================================================================
+const errbGridEl = document.getElementById("errbGroupsGrid");
+ERRB_GROUPS.forEach(([grpTitle, regOen, regStat, items]) => {
+  const box = document.createElement("div");
+  box.className = "card";
+  box.style.marginBottom = "0";
+  box.style.padding = "8px 10px";
+  let html = `<div style="font-size:11.5px; font-weight:700; color:#002D3A; margin-bottom:4px;">${grpTitle} (0x${hex4(regOen)} / 0x${hex4(regStat)})</div>`;
+  items.forEach(([lbl, bOen, bStat]) => {
+    const idKey = `${hex4(regOen)}_${bOen}_${hex4(regStat)}_${bStat}`;
+    html += `<div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; margin:2px 0;">
+      <label style="font-size:11px;"><input type="checkbox" id="chk_${idKey}" data-oen="${regOen}" data-boen="${bOen}" /> ${lbl}</label>
+      <span class="led led-gray" id="led_${idKey}"></span>
+    </div>`;
+  });
+  box.innerHTML = html;
+  errbGridEl.appendChild(box);
+});
+
+errbGridEl.addEventListener("change", async ev => {
+  const chk = ev.target;
+  if (!chk || chk.type !== "checkbox") return;
+  const regOen = parseInt(chk.dataset.oen, 10);
+  const bOen = parseInt(chk.dataset.boen, 10);
+  const cam = document.getElementById("selErrbCam").value;
+  const serA = state.serAddrMap[cam];
+  await withEvkitLock(async () => {
+    const cur = await readByte(serA, regOen);
+    const nxt = chk.checked ? (cur | (1 << bOen)) : (cur & ~(1 << bOen));
+    await writeByte(serA, regOen, nxt);
+    appendLog("logErrb", `[${cam}] OEN 0x${hex4(regOen)}: 0x${hex2(cur)} -> 0x${hex2(nxt)}`);
+  });
+});
+
+async function refreshErrbStatus() {
+  if (!state.evkitPort) return;
+  const cam = document.getElementById("selErrbCam").value;
+  const serA = state.serAddrMap[cam];
+  await withEvkitLock(async () => {
+    const cache = {};
+    for (const [, rOen, rStat] of ERRB_GROUPS) {
+      if (!(rOen in cache)) cache[rOen] = await readByte(serA, rOen);
+      if (!(rStat in cache)) cache[rStat] = await readByte(serA, rStat);
+    }
+    ERRB_GROUPS.forEach(([, rOen, rStat, items]) => {
+      items.forEach(([, bOen, bStat]) => {
+        const idKey = `${hex4(rOen)}_${bOen}_${hex4(rStat)}_${bStat}`;
+        const oenOn = ((cache[rOen] >> bOen) & 1) === 1;
+        const errOn = ((cache[rStat] >> bStat) & 1) === 1;
+        document.getElementById(`chk_${idKey}`).checked = oenOn;
+        document.getElementById(`led_${idKey}`).className = "led " + (!errOn ? "led-green" : (oenOn ? "led-red" : "led-amber"));
+      });
+    });
+  });
+}
+document.getElementById("btnErrbRefresh").addEventListener("click", refreshErrbStatus);
+
+document.getElementById("btnErrbClearSticky").addEventListener("click", async () => {
+  if (!state.evkitPort) return;
+  const cam = document.getElementById("selErrbCam").value;
+  const serA = state.serAddrMap[cam];
+  await withEvkitLock(async () => {
+    for (const cnt of [0x1025, 0x1026, 0x102D, 0x102E, 0x102F, 0x1030]) {
+      try { await readByte(serA, cnt); await writeByte(serA, cnt, 1); await writeByte(serA, cnt, 0); } catch {}
+    }
+    for (const [, , rStat] of ERRB_GROUPS) {
+      try {
+        const v = await readByte(serA, rStat);
+        if (v !== 0) await writeByte(serA, rStat, v);
+      } catch {}
+    }
+    try { await writeByte(serA, 0x0118, 0x01); } catch {}
+  });
+  appendLog("logErrb", `[${cam}] Sticky registers & counters cleared.`);
+  await refreshErrbStatus();
+});
+
+// =============================================================================
+// OFFLINE S-PARAMETER ANALYZER
+// =============================================================================
+function computeSparamLimit(level, rate, param, fMhz) {
+  const fHz = fMhz * 1e6;
+  if (param === "IL") {
+    if (level === "System Level" && rate === "3 Gbps") {
+      return -((fMhz <= 5 ? 7.7 : 5.7) + 0.27 * Math.sqrt(Math.max(0, fHz * 1e-6)) + 2.2 * (fHz * 1e-9));
+    }
+    if (level === "System Level" && rate === "6 Gbps") {
+      return fMhz <= 500
+        ? -(3.2 + 0.25 * Math.sqrt(Math.max(0, fHz * 1e-6)) + 0.64 * (fHz * 1e-9))
+        : -(2.74 + 0.25 * Math.sqrt(Math.max(0, fHz * 1e-6)) + 1.56 * (fHz * 1e-9));
+    }
+    if (level === "PCB Level" && rate === "3 Gbps") return fMhz <= 5 ? -3.0 : -2.0;
+    return fMhz <= 500 ? -0.85 : (-0.62 - 0.46 * (fHz * 1e-9));
+  } else {
+    if (fMhz <= 10) return -6.0 - 0.9 * (fHz * 1e-6);
+    if (fMhz <= 200) return -(14.2 + 0.28 * Math.sqrt(Math.max(0, fHz * 1e-6)) + 0.8 * (fHz * 1e-9));
+    if (fMhz <= 400) return -18.3 + 0.02 * ((fHz * 1e-6) - 200);
+    if (fMhz <= 1500) return 5.7e-3 * (fHz * 1e-6) - 16.6;
+    return -8.0;
+  }
+}
+
+function parseVnaCsv(text, filename) {
+  const rows = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const c = raw.split(",").map(s => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+    if (!c.length || c[0].startsWith("#") || c[0].startsWith("//")) continue;
+    const f = parseFloat(c[0]), v1 = parseFloat(c[1]);
+    if (!isNaN(f) && !isNaN(v1)) {
+      const v2 = c.length >= 3 ? parseFloat(c[2]) : NaN;
+      rows.push({ f, v1, v2: !isNaN(v2) ? v2 : null });
+    }
+  }
+  if (rows.length < 2) throw new Error(`No valid data rows in ${filename}`);
+  const maxF = Math.max(...rows.map(r => r.f));
+  const scale = maxF > 1e6 ? 1e-6 : (maxF < 100 ? 1e3 : 1);
+  rows.forEach(r => r.fMhz = r.f * scale);
+  rows.sort((a, b) => a.fMhz - b.fMhz);
+  return { filename, rows };
+}
+
+const chartSparamIl = new Chart(document.getElementById("chartSparamIl"), {
+  type: "line",
+  data: { datasets: [] },
+  options: { responsive: true, maintainAspectRatio: false, elements: { point: { radius: 0 } }, scales: { x: { type: "linear", title: { display: true, text: "Frequency [MHz]" } }, y: { min: -26, max: 0.5, title: { display: true, text: "IL [dB]" } } } }
+});
+const chartSparamRl = new Chart(document.getElementById("chartSparamRl"), {
+  type: "line",
+  data: { datasets: [] },
+  options: { responsive: true, maintainAspectRatio: false, elements: { point: { radius: 0 } }, scales: { x: { type: "linear", title: { display: true, text: "Frequency [MHz]" } }, y: { min: -45, max: 0, title: { display: true, text: "RL [dB]" } } } }
+});
+
+function recomputeSparam() {
+  const level = document.getElementById("selSparamLevel").value;
+  const rate = document.getElementById("selSparamRate").value;
+  const scaleType = document.getElementById("selSparamScale").value;
+  const maxF = rate === "6 Gbps" ? 3500 : 2000;
+  document.getElementById("lblSparamSpec").textContent = `Active Limit Mask: ${level} | GMSL2 ${rate} (Eval: 2 - ${maxF} MHz)`;
+
+  const gridF = [];
+  for (let f = 2; f <= maxF; f += (maxF - 2) / 400) gridF.push(f);
+  const ilLimPts = gridF.map(f => ({ x: f, y: computeSparamLimit(level, rate, "IL", f) }));
+  const rlLimPts = gridF.map(f => ({ x: f, y: computeSparamLimit(level, rate, "RL", f) }));
+
+  const ilDs = [{ label: `${level} ${rate} Limit`, data: ilLimPts, borderColor: "#D32F2F", borderDash: [6, 4], borderWidth: 2 }];
+  const rlDs = [{ label: `${level} ${rate} Limit`, data: rlLimPts, borderColor: "#D32F2F", borderDash: [6, 4], borderWidth: 2 }];
+
+  let ilOk = null, rlOk = null;
+  if (state.sparamIl) {
+    const pts = state.sparamIl.rows.map(r => ({ x: r.fMhz, y: r.v1 }));
+    ilDs.push({ label: state.sparamIl.filename, data: pts, borderColor: "#0277BD", borderWidth: 1.8 });
+    let worstM = Infinity, worstF = 0;
+    for (const r of state.sparamIl.rows) {
+      if (r.fMhz >= 2 && r.fMhz <= maxF) {
+        const m = r.v1 - computeSparamLimit(level, rate, "IL", r.fMhz);
+        if (m < worstM) { worstM = m; worstF = r.fMhz; }
+      }
+    }
+    ilOk = worstM >= 0;
+    const el = document.getElementById("lblSparamIlStat");
+    el.textContent = `${ilOk ? "PASS" : "FAIL"} (${worstM.toFixed(2)} dB)`;
+    el.className = "verdict-pill " + (ilOk ? "verdict-pass" : "verdict-fail");
+    document.getElementById("lblSparamIlDet").textContent = `Worst Margin: ${worstM.toFixed(2)} dB @ ${worstF.toFixed(1)} MHz`;
+  }
+
+  if (state.sparamRl) {
+    const pts = state.sparamRl.rows.map(r => ({ x: r.fMhz, y: r.v1 }));
+    rlDs.push({ label: state.sparamRl.filename, data: pts, borderColor: "#00695C", borderWidth: 1.8 });
+    let worstM = Infinity, worstF = 0;
+    for (const r of state.sparamRl.rows) {
+      if (r.fMhz >= 2 && r.fMhz <= maxF) {
+        const m = computeSparamLimit(level, rate, "RL", r.fMhz) - r.v1;
+        if (m < worstM) { worstM = m; worstF = r.fMhz; }
+      }
+    }
+    rlOk = worstM >= 0;
+    const el = document.getElementById("lblSparamRlStat");
+    el.textContent = `${rlOk ? "PASS" : "FAIL"} (${worstM.toFixed(2)} dB)`;
+    el.className = "verdict-pill " + (rlOk ? "verdict-pass" : "verdict-fail");
+    document.getElementById("lblSparamRlDet").textContent = `Worst Margin: ${worstM.toFixed(2)} dB @ ${worstF.toFixed(1)} MHz`;
+  }
+
+  if (ilOk !== null || rlOk !== null) {
+    const allOk = (ilOk !== false) && (rlOk !== false);
+    const ov = document.getElementById("lblSparamOverall");
+    ov.textContent = allOk ? "PASS (COMPLIANT)" : "FAIL (NON-COMPLIANT)";
+    ov.className = "verdict-pill " + (allOk ? "verdict-pass" : "verdict-fail");
+    document.getElementById("btnExportSparamXls").disabled = false;
+  }
+
+  chartSparamIl.options.scales.x.type = scaleType;
+  chartSparamRl.options.scales.x.type = scaleType;
+  chartSparamIl.data.datasets = ilDs;
+  chartSparamRl.data.datasets = rlDs;
+  chartSparamIl.update();
+  chartSparamRl.update();
+}
+
+document.getElementById("fileSparamIl").addEventListener("change", async ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  try {
+    const parsed = parseVnaCsv(await f.text(), f.name);
+    state.sparamIl = parsed;
+    appendLog("logSparam", `Loaded Insertion Loss: ${f.name} (${parsed.rows.length} pts)`);
+    if (parsed.rows.some(r => r.v2 !== null && Math.abs(r.v2) > 1e-12) && !state.sparamRl) {
+      state.sparamRl = { filename: `${f.name} (Col 3)`, rows: parsed.rows.map(r => ({ fMhz: r.fMhz, v1: r.v2 })) };
+      appendLog("logSparam", "Mapped 3rd column to Return Loss.");
+    }
+    recomputeSparam();
+  } catch (e) { alert(e.message); }
+});
+
+document.getElementById("fileSparamRl").addEventListener("change", async ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  try {
+    state.sparamRl = parseVnaCsv(await f.text(), f.name);
+    appendLog("logSparam", `Loaded Return Loss: ${f.name} (${state.sparamRl.rows.length} pts)`);
+    recomputeSparam();
+  } catch (e) { alert(e.message); }
+});
+
+["selSparamLevel", "selSparamRate", "selSparamScale"].forEach(id => {
+  document.getElementById(id).addEventListener("change", recomputeSparam);
+});
+recomputeSparam();
+
+// =============================================================================
+// OFFLINE TDR ANALYZER
+// =============================================================================
+const chartTdr = new Chart(document.getElementById("chartTdr"), {
+  type: "line",
+  data: { datasets: [] },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    elements: { point: { radius: 0 } },
+    scales: {
+      x: { type: "linear", title: { display: true, text: "Time [ns]" } },
+      y: { min: 38, max: 62, title: { display: true, text: "Impedance [Ohm]" } }
+    }
+  }
+});
+
+function recomputeTdr() {
+  if (!state.tdrData) return;
+  const useW = document.getElementById("chkTdrWin").checked;
+  const tMin = parseFloat(document.getElementById("inTdrTmin").value);
+  const tMax = parseFloat(document.getElementById("inTdrTmax").value);
+  const evPts = useW ? state.tdrData.rows.filter(r => r.tNs >= tMin && r.tNs <= tMax) : state.tdrData.rows;
+  if (!evPts.length) return;
+
+  let zMin = Infinity, tAtMin = 0, zMax = -Infinity, tAtMax = 0, outCnt = 0;
+  for (const p of evPts) {
+    if (p.z < zMin) { zMin = p.z; tAtMin = p.tNs; }
+    if (p.z > zMax) { zMax = p.z; tAtMax = p.tNs; }
+    if (p.z < 45 || p.z > 55) outCnt++;
+  }
+  document.getElementById("lblTdrZmin").textContent = `${zMin.toFixed(2)} Ohm @ ${tAtMin.toFixed(2)} ns`;
+  document.getElementById("lblTdrZmax").textContent = `${zMax.toFixed(2)} Ohm @ ${tAtMax.toFixed(2)} ns`;
+  const stEl = document.getElementById("lblTdrStatus");
+  stEl.textContent = outCnt === 0 ? "WITHIN 50 Ohm +/-10% (INFO)" : "OUTSIDE +/-10% BAND (INFO)";
+  stEl.className = "verdict-pill " + (outCnt === 0 ? "verdict-pass" : "verdict-warn");
+  document.getElementById("btnExportTdrXls").disabled = false;
+
+  const x0 = state.tdrData.rows[0].tNs, x1 = state.tdrData.rows[state.tdrData.rows.length - 1].tNs;
+  chartTdr.data.datasets = [
+    { label: "Upper Limit (55 Ohm)", data: [{ x: x0, y: 55 }, { x: x1, y: 55 }], borderColor: "#2E7D32", borderDash: [5, 5], borderWidth: 1.5 },
+    { label: "Nominal (50 Ohm)", data: [{ x: x0, y: 50 }, { x: x1, y: 50 }], borderColor: "#66BB6A", borderDash: [2, 4], borderWidth: 1.2 },
+    { label: "Lower Limit (45 Ohm)", data: [{ x: x0, y: 45 }, { x: x1, y: 45 }], borderColor: "#2E7D32", borderDash: [5, 5], borderWidth: 1.5 },
+    { label: state.tdrData.filename, data: state.tdrData.rows.map(r => ({ x: r.tNs, y: r.z })), borderColor: "#0277BD", borderWidth: 1.8 },
+  ];
+  chartTdr.options.scales.y.min = Math.min(38, zMin - 3);
+  chartTdr.options.scales.y.max = Math.max(62, zMax + 3);
+  chartTdr.update();
+}
+
+document.getElementById("fileTdrCsv").addEventListener("change", async ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  try {
+    const rows = [];
+    for (const raw of (await f.text()).split(/\r?\n/)) {
+      const c = raw.split(",").map(s => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+      if (!c.length || c[0].startsWith("#")) continue;
+      const t = parseFloat(c[0]), z = parseFloat(c[1]);
+      if (!isNaN(t) && !isNaN(z)) rows.push({ t, z });
+    }
+    if (rows.length < 2) throw new Error("Invalid TDR CSV file");
+    const maxT = Math.max(...rows.map(r => Math.abs(r.t)));
+    const mult = maxT < 1e-3 ? 1e9 : (maxT < 1 ? 1e3 : 1);
+    rows.forEach(r => r.tNs = r.t * mult);
+    rows.sort((a, b) => a.tNs - b.tNs);
+    state.tdrData = { filename: f.name, rows };
+    appendLog("logTdr", `Loaded TDR trace: ${f.name} (${rows.length} pts)`);
+    recomputeTdr();
+  } catch (e) { alert(e.message); }
+});
+document.getElementById("btnApplyTdrWin").addEventListener("click", recomputeTdr);
+
+// =============================================================================
+// POWER SUPPLY (PL303QMD-P VIA WEB SERIAL @ 9600 BPS)
+// =============================================================================
+function withPsuLock(fn) {
+  const next = state.psuLock.then(fn, fn);
+  state.psuLock = next.catch(() => {});
+  return next;
+}
+
+async function psuWrite(cmd) {
+  if (!state.psuWriter) throw new Error("PSU not connected");
+  await state.psuWriter.write(new TextEncoder().encode(cmd.trim() + "\n"));
+}
+
+async function psuQuery(cmd) {
+  await psuWrite(cmd);
+  const dec = new TextDecoder();
+  const t0 = performance.now();
+  while ((performance.now() - t0) < 500) {
+    const idx = state.psuLineBuf.indexOf("\n");
+    if (idx >= 0) {
+      const line = state.psuLineBuf.slice(0, idx).replace(/\r/g, "").trim();
+      state.psuLineBuf = state.psuLineBuf.slice(idx + 1);
+      return line;
+    }
+    let timer;
+    const res = await Promise.race([
+      state.psuReader.read(),
+      new Promise(r => { timer = setTimeout(() => r({ timeout: true }), 40); })
+    ]);
+    clearTimeout(timer);
+    if (res.timeout) continue;
+    if (res.done) break;
+    state.psuLineBuf += dec.decode(res.value, { stream: true });
+  }
+  return "";
+}
+
+async function pollPsuMeters() {
+  if (!state.psuConnected) return null;
+  let data = null;
+  await withPsuLock(async () => {
+    const parseF = s => parseFloat((s || "").replace(/[^0-9.\-+eE]/g, "")) || 0;
+    const v1 = parseF(await psuQuery("V1O?"));
+    const i1 = parseF(await psuQuery("I1O?"));
+    const op1 = (await psuQuery("OP1?")).trim() === "1";
+    const v2 = parseF(await psuQuery("V2O?"));
+    const i2 = parseF(await psuQuery("I2O?"));
+    const op2 = (await psuQuery("OP2?")).trim() === "1";
+    state.psuOut1 = op1;
+    state.psuOut2 = op2;
+    data = { v1, i1, op1, v2, i2, op2 };
+
+    document.getElementById("meterV1").textContent = `${v1.toFixed(3)} V`;
+    document.getElementById("meterI1").textContent = `${i1.toFixed(4)} A`;
+    document.getElementById("meterP1").textContent = `${(v1 * i1).toFixed(2)} W`;
+    document.getElementById("badgeOut1").textContent = op1 ? "OUTPUT ON" : "OUTPUT OFF";
+    document.getElementById("badgeOut1").className = "badge " + (op1 ? "ok" : "err");
+    document.getElementById("btnToggleCh1").textContent = op1 ? "Turn CH1 OFF" : "Turn CH1 ON";
+
+    document.getElementById("meterV2").textContent = `${v2.toFixed(3)} V`;
+    document.getElementById("meterI2").textContent = `${i2.toFixed(4)} A`;
+    document.getElementById("meterP2").textContent = `${(v2 * i2).toFixed(2)} W`;
+    document.getElementById("badgeOut2").textContent = op2 ? "OUTPUT ON" : "OUTPUT OFF";
+    document.getElementById("badgeOut2").className = "badge " + (op2 ? "ok" : "err");
+    document.getElementById("btnToggleCh2").textContent = op2 ? "Turn CH2 OFF" : "Turn CH2 ON";
+
+    const hb = document.getElementById("badgePsu");
+    if (op1 || op2) {
+      hb.textContent = `PSU: CH1 ${v1.toFixed(2)}V/${i1.toFixed(2)}A`;
+      hb.className = "badge ok";
+    } else {
+      hb.textContent = "PSU: STANDBY (OFF)";
+      hb.className = "badge";
+    }
+  });
+  return data;
+}
+
+document.getElementById("btnConnectPsu").addEventListener("click", async () => {
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+    state.psuPort = port;
+    state.psuWriter = port.writable.getWriter();
+    state.psuReader = port.readable.getReader();
+    let idn = "";
+    await withPsuLock(async () => { idn = await psuQuery("*IDN?"); });
+    if (!idn) throw new Error("No response to *IDN? at 9600 bps.");
+    state.psuConnected = true;
+    document.getElementById("lblPsuIdn").textContent = `ID: ${idn}`;
+    ["btnDisconnectPsu", "btnPsuPollNow", "btnPsuLocal", "btnToggleCh1", "btnToggleCh2", "btnApplyCh1", "btnApplyCh2"].forEach(id => {
+      document.getElementById(id).disabled = false;
+    });
+    document.getElementById("btnConnectPsu").disabled = true;
+    syncAccessAndSelectors();
+    appendLog("logPsu", `Connected (9600 bps) -> ${idn}`);
+    await pollPsuMeters();
+  } catch (e) {
+    alert(`PSU Connection Error: ${e.message}`);
+  }
+});
+
+document.getElementById("btnDisconnectPsu").addEventListener("click", async () => {
+  try {
+    if (state.psuReader) { await state.psuReader.cancel(); state.psuReader.releaseLock(); }
+    if (state.psuWriter) { state.psuWriter.releaseLock(); }
+    if (state.psuPort) { await state.psuPort.close(); }
+  } catch {}
+  state.psuConnected = false;
+  state.psuPort = state.psuReader = state.psuWriter = null;
+  document.getElementById("btnConnectPsu").disabled = false;
+  ["btnDisconnectPsu", "btnPsuPollNow", "btnPsuLocal", "btnToggleCh1", "btnToggleCh2", "btnApplyCh1", "btnApplyCh2"].forEach(id => {
+    document.getElementById(id).disabled = true;
+  });
+  syncAccessAndSelectors();
+  appendLog("logPsu", "Disconnected PL303QMD-P.");
+});
+
+document.getElementById("btnPsuPollNow").addEventListener("click", pollPsuMeters);
+document.getElementById("btnPsuLocal").addEventListener("click", () => withPsuLock(() => psuWrite("LOCAL")));
+
+for (const ch of [1, 2]) {
+  document.getElementById(`btnApplyCh${ch}`).addEventListener("click", async () => {
+    const v = parseFloat(document.getElementById(`inV${ch}`).value);
+    const i = parseFloat(document.getElementById(`inI${ch}`).value);
+    const ovp = parseFloat(document.getElementById(`inOvp${ch}`).value);
+    const ocp = parseFloat(document.getElementById(`inOcp${ch}`).value);
+    await withPsuLock(async () => {
+      await psuWrite(`OVP${ch} ${ovp.toFixed(3)}`);
+      await psuWrite(`OCP${ch} ${ocp.toFixed(3)}`);
+      await psuWrite(`V${ch} ${v.toFixed(3)}`);
+      await psuWrite(`I${ch} ${i.toFixed(4)}`);
+    });
+    appendLog("logPsu", `[CH${ch}] Applied V=${v.toFixed(3)}V, I=${i.toFixed(4)}A`);
+    await pollPsuMeters();
+  });
+
+  document.getElementById(`btnToggleCh${ch}`).addEventListener("click", async () => {
+    const nextState = (ch === 1 ? state.psuOut1 : state.psuOut2) ? 0 : 1;
+    await withPsuLock(async () => { await psuWrite(`OP${ch} ${nextState}`); });
+    appendLog("logPsu", `[CH${ch}] Output switched ${nextState ? "ON" : "OFF"}`);
+    await sleep(100);
+    await pollPsuMeters();
+  });
+}
+
+// =============================================================================
+// I2C COMMUNICATION TAB
+// =============================================================================
+document.getElementById("selI2cDevType").addEventListener("change", () => {
+  const cam = document.getElementById("selI2cCam").value;
+  const typ = document.getElementById("selI2cDevType").value;
+  let addr = state.serAddrMap[cam], w = "16", reg = "0x0000";
+  if (typ === "Imager") { addr = state.sensAddrMap[cam]; }
+  else if (typ === "EEPROM") { addr = state.eepAddrMap[cam]; w = "8"; reg = "0x00"; }
+  else if (typ === "PMIC") { addr = cam === "PHYA" ? 0x50 : 0x52; w = "8"; reg = "0x00"; }
+  else if (typ === "Deserializer") { addr = DES_ADDR; reg = "0x0013"; }
+  document.getElementById("inI2cDevAddr").value = "0x" + hex2(addr);
+  document.getElementById("selI2cWidth").value = w;
+  document.getElementById("inI2cReg").value = reg;
+});
+
+document.getElementById("btnI2cQuickRead").addEventListener("click", async () => {
+  const da = parseInt(document.getElementById("inI2cDevAddr").value, 16);
+  const ra = parseInt(document.getElementById("inI2cReg").value, 16);
+  const cnt = parseInt(document.getElementById("inI2cCnt").value, 10);
+  const is16 = document.getElementById("selI2cWidth").value === "16";
+  const cmd = is16 ? `RIB ${hex2(da)} ${hex4(ra)} ${cnt}` : `RB ${hex2(da)} ${hex2(ra)} ${cnt}`;
+  await withEvkitLock(async () => {
+    const resp = await sendEvkitCmd(cmd, 180);
+    document.getElementById("lblI2cLastRead").textContent = resp || "<TIMEOUT>";
+    appendLog("logI2c", `> ${cmd}  ->  ${resp || "<TIMEOUT>"}`);
+  });
+});
+
+document.getElementById("btnI2cQuickWrite").addEventListener("click", async () => {
+  const da = parseInt(document.getElementById("inI2cDevAddr").value, 16);
+  const ra = parseInt(document.getElementById("inI2cReg").value, 16);
+  const val = parseInt(document.getElementById("inI2cVal").value, 16);
+  const is16 = document.getElementById("selI2cWidth").value === "16";
+  const cmd = is16 ? `WIB ${hex2(da)} ${hex4(ra)} ${hex2(val)}` : `WB ${hex2(da)} ${hex2(ra)} ${hex2(val)}`;
+  await withEvkitLock(async () => {
+    const resp = await sendEvkitCmd(cmd, 180);
+    appendLog("logI2c", `> ${cmd}  ->  ${resp || "<TIMEOUT>"}`);
+  });
+});
+
+document.getElementById("btnSendI2cBatch").addEventListener("click", async () => {
+  const lines = document.getElementById("txtI2cBatch").value.split(/\r?\n/);
+  await withEvkitLock(async () => {
+    for (let i = 0; i < lines.length; i++) {
+      const p = parseScriptLine(lines[i]);
+      if (!p) continue;
+      if (p.kind === "DELAY") { await sleep(p.ms); continue; }
+      const resp = await sendEvkitCmd(p.cmd, 180);
+      appendLog("logI2c", `[L${i+1}] > ${p.cmd}  ->  ${resp || "<TIMEOUT>"}`);
+    }
+  });
+});
+
+// =============================================================================
+// S-PARAMETERS & TDR EXCEL EXPORTS + CLEAR
+// =============================================================================
+document.getElementById("btnClearSparam").addEventListener("click", () => {
+  state.sparamIl = null;
+  state.sparamRl = null;
+  document.getElementById("fileSparamIl").value = "";
+  document.getElementById("fileSparamRl").value = "";
+  document.getElementById("btnExportSparamXls").disabled = true;
+  document.getElementById("lblSparamIlStat").textContent = "NOT LOADED";
+  document.getElementById("lblSparamIlStat").className = "verdict-pill";
+  document.getElementById("lblSparamRlStat").textContent = "NOT LOADED";
+  document.getElementById("lblSparamRlStat").className = "verdict-pill";
+  document.getElementById("lblSparamOverall").textContent = "---";
+  document.getElementById("lblSparamOverall").className = "verdict-pill";
+  recomputeSparam();
+});
+
+document.getElementById("btnExportSparamXls").addEventListener("click", () => {
+  if (typeof XLSX === "undefined") return;
+  const level = document.getElementById("selSparamLevel").value;
+  const rate = document.getElementById("selSparamRate").value;
+  const maxF = rate === "6 Gbps" ? 3500 : 2000;
+  const wb = XLSX.utils.book_new();
+  const summary = [
+    ["GMSL2 - S-PARAMETER VALIDATION REPORT"],
+    ["Standard", `${level} | GMSL2 ${rate}`],
+    ["Sample ID", document.getElementById("inSparamSample").value || "N/A"],
+    ["Harness", document.getElementById("inSparamHarness").value || "N/A"],
+    ["Overall Verdict", document.getElementById("lblSparamOverall").textContent],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), "Summary");
+  if (state.sparamIl) {
+    const ilRows = [["Freq [MHz]", "Measured IL [dB]", "Limit [dB]", "Margin [dB]"]];
+    for (const r of state.sparamIl.rows) {
+      if (r.fMhz >= 2 && r.fMhz <= maxF) {
+        const lim = computeSparamLimit(level, rate, "IL", r.fMhz);
+        ilRows.push([+r.fMhz.toFixed(3), +r.v1.toFixed(3), +lim.toFixed(3), +(r.v1 - lim).toFixed(3)]);
+      }
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ilRows), "Insertion_Loss");
+  }
+  if (state.sparamRl) {
+    const rlRows = [["Freq [MHz]", "Measured RL [dB]", "Limit [dB]", "Margin [dB]"]];
+    for (const r of state.sparamRl.rows) {
+      if (r.fMhz >= 2 && r.fMhz <= maxF) {
+        const lim = computeSparamLimit(level, rate, "RL", r.fMhz);
+        rlRows.push([+r.fMhz.toFixed(3), +r.v1.toFixed(3), +lim.toFixed(3), +(lim - r.v1).toFixed(3)]);
+      }
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rlRows), "Return_Loss");
+  }
+  XLSX.writeFile(wb, `Valeo_GMSL2_SParam_Report_${Date.now()}.xlsx`);
+});
+
+document.getElementById("btnExportTdrXls").addEventListener("click", () => {
+  if (!state.tdrData || typeof XLSX === "undefined") return;
+  const wb = XLSX.utils.book_new();
+  const rows = [["Time [ns]", "Impedance [Ohm]", "Lower Limit [Ohm]", "Upper Limit [Ohm]", "Status"]];
+  for (const p of state.tdrData.rows) {
+    const st = p.z < 45 ? "LOW (<45 Ohm - INFO)" : (p.z > 55 ? "HIGH (>55 Ohm - INFO)" : "WITHIN BAND");
+    rows.push([+p.tNs.toFixed(4), +p.z.toFixed(4), 45, 55, st]);
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "TDR_Data");
+  XLSX.writeFile(wb, `Valeo_GMSL2_TDR_Report_${Date.now()}.xlsx`);
+});
+
+// =============================================================================
+// AUTOMATIC TEST SUITE
+// =============================================================================
+document.getElementById("btnStopAuto").addEventListener("click", () => { state.stopRequested = true; });
+
+document.getElementById("btnStartAuto").addEventListener("click", async () => {
+  if (!state.evkitPort) return alert("Connect EVKIT USB/COM port first!");
+  state.stopRequested = false;
+  state.autoResults = [];
+  const tbody = document.querySelector("#tblAutoResults tbody");
+  tbody.innerHTML = "";
+  document.getElementById("btnStartAuto").disabled = true;
+  document.getElementById("btnStopAuto").disabled = false;
+  document.getElementById("btnExportAutoXls").disabled = true;
+
+  const doMargin = document.getElementById("chkAutoMargin").checked;
+  const doEeprom = document.getElementById("chkAutoEeprom").checked;
+  const doErrb = document.getElementById("chkAutoErrb").checked;
+  const doCurr = document.getElementById("chkAutoCurrent").checked;
+  const psuCh = document.getElementById("selAutoPsuCh").value;
+  const volts = document.getElementById("inAutoVolts").value.split(",").map(s => parseFloat(s.trim())).filter(v => !isNaN(v));
+  const iLim = parseFloat(document.getElementById("inAutoIlim").value) || 1.0;
+  const sampleA = document.getElementById("inAutoSampleA").value || "Sample_A";
+  const sampleB = document.getElementById("inAutoSampleB").value || "Sample_B";
+  const cams = state.detectedTopology === "DUAL" ? ["PHYA", "PHYB"] : (state.detectedTopology === "SINGLE_PHYB" ? ["PHYB"] : ["PHYA"]);
+  const chs = psuCh === "BOTH" ? [1, 2] : (psuCh === "CH2" ? [2] : [1]);
+
+  try {
+    let step = 0;
+    const total = Math.max(1, volts.length * cams.length);
+    for (const v of volts) {
+      if (state.stopRequested) break;
+      document.getElementById("lblAutoStatus").textContent = `Status: Testing ${v.toFixed(2)} V...`;
+      appendLog("logAuto", `--- Setting PSU ${psuCh} -> ${v.toFixed(2)} V ---`);
+
+      let tIdle = null, tStream = null;
+      if (state.psuConnected) {
+        await withPsuLock(async () => {
+          for (const c of chs) await psuWrite(`OP${c} 0`);
+          await sleep(250);
+          for (const c of chs) {
+            await psuWrite(`V${c} ${v.toFixed(3)}`);
+            await psuWrite(`I${c} ${iLim.toFixed(4)}`);
+            await psuWrite(`OP${c} 1`);
+          }
+          await sleep(450);
+        });
+        tIdle = await pollPsuMeters();
+      }
+
+      if (state.scriptText) await runInitScript(true);
+      await sleep(300);
+      if (state.psuConnected) tStream = await pollPsuMeters();
+
+      for (const cam of cams) {
+        if (state.stopRequested) break;
+        const cNum = (chs.length === 1 || cam === "PHYA") ? chs[0] : chs[chs.length - 1];
+        const iIdleStr = (doCurr && tIdle) ? `${(tIdle[`i${cNum}`] * 1000).toFixed(1)} mA` : "N/A";
+        const iStrmStr = (doCurr && tStream) ? `${(tStream[`i${cNum}`] * 1000).toFixed(1)} mA` : "N/A";
+        const camOk = cam === "PHYA" ? state.lockA : state.lockB;
+        let eepStr = "Skipped", eepOk = true;
+        let errbStr = "Skipped", errbOk = true;
+        let fwdStr = "Skipped", revStr = "Skipped", margOk = true;
+
+        if (!camOk) {
+          eepStr = doEeprom ? "NO LOCK" : "Skipped";
+          errbStr = doErrb ? "NO LOCK" : "Skipped";
+          fwdStr = doMargin ? "NO LOCK" : "Skipped";
+          revStr = doMargin ? "NO LOCK" : "Skipped";
+          eepOk = !doEeprom; errbOk = !doErrb; margOk = !doMargin;
+        } else {
+          if (doEeprom) {
+            await withEvkitLock(async () => {
+              const serA = state.serAddrMap[cam], eepA = state.eepAddrMap[cam];
+              await writeByte(serA, 0x351C, eepA);
+              await writeByte(serA, 0x351D, EEPROM_DEFAULT_ADDR);
+              const rb = await sendEvkitCmd(`RB ${hex2(eepA)} 00 1`, 150);
+              eepOk = rb && !rb.toUpperCase().includes("ERR");
+              eepStr = eepOk ? `PASS (${rb})` : "FAIL";
+            });
+          }
+          if (doErrb) {
+            await withEvkitLock(async () => {
+              const s13 = await readByte(state.serAddrMap[cam], 0x0013);
+              errbOk = (s13 & 0x04) === 0;
+              errbStr = errbOk ? "PASS (0 Err)" : `FAIL (0x${hex2(s13)})`;
+            });
+          }
+          if (doMargin) {
+            // Trigger single-cam Link Margin sweep
+            document.getElementById("selMarginCam").value = `${cam} ONLY`;
+            document.getElementById("btnStartMargin").click();
+            while (document.getElementById("btnStartMargin").disabled) await sleep(200);
+            const r = state.lastMarginResults?.[cam];
+            if (r) {
+              fwdStr = `${r.fwdDelta} mV (${r.fwdStatus})`;
+              revStr = `${r.revDelta} mV (${r.revStatus})`;
+              margOk = r.fwdStatus === "PASS" && r.revStatus === "PASS";
+            }
+          }
+        }
+
+        const pass = camOk && eepOk && errbOk && margOk;
+        const rec = {
+          Voltage: `${v.toFixed(2)} V`,
+          PSU_CH: psuCh,
+          Port: cam,
+          Sample_ID: cam === "PHYA" ? sampleA : sampleB,
+          Idle_I: iIdleStr,
+          Stream_I: iStrmStr,
+          FWD: fwdStr,
+          REV: revStr,
+          EEPROM: eepStr,
+          ERRB: errbStr,
+          Verdict: pass ? "PASS" : "FAIL",
+        };
+        state.autoResults.push(rec);
+        const tr = document.createElement("tr");
+        tr.className = pass ? "row-pass" : "row-fail";
+        tr.innerHTML = Object.values(rec).map(val => `<td>${val}</td>`).join("");
+        tbody.appendChild(tr);
+
+        step++;
+        document.getElementById("progAuto").value = Math.round((step / total) * 100);
+      }
+    }
+    document.getElementById("lblAutoStatus").textContent = "Status: Automatic Test Suite FINISHED.";
+    if (state.autoResults.length) document.getElementById("btnExportAutoXls").disabled = false;
+  } finally {
+    document.getElementById("btnStartAuto").disabled = false;
+    document.getElementById("btnStopAuto").disabled = true;
+  }
+});
+
+document.getElementById("btnExportAutoXls").addEventListener("click", () => {
+  if (!state.autoResults.length || typeof XLSX === "undefined") return;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.autoResults), "Automatic_Test");
+  XLSX.writeFile(wb, `Valeo_GMSL2_Auto_Report_${Date.now()}.xlsx`);
+});
+
+// =============================================================================
+// LONG-RUN SOAK TEST
+// =============================================================================
+const chartSoak = new Chart(document.getElementById("chartSoak"), {
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [
+      { label: "CH1 Current [mA]", data: [], borderColor: "#0277BD", yAxisID: "y" },
+      { label: "Cumulative Errors", data: [], borderColor: "#D32F2F", yAxisID: "y1" },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { title: { display: true, text: "Elapsed [s]" } },
+      y: { type: "linear", position: "left", title: { display: true, text: "Current [mA]" } },
+      y1: { type: "linear", position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "Errors" } }
+    }
+  }
+});
+
+document.getElementById("btnStopSoak").addEventListener("click", () => { state.stopRequested = true; });
+
+document.getElementById("btnStartSoak").addEventListener("click", async () => {
+  state.stopRequested = false;
+  state.soakRecords = [];
+  chartSoak.data.labels = [];
+  chartSoak.data.datasets[0].data = [];
+  chartSoak.data.datasets[1].data = [];
+  chartSoak.update();
+
+  document.getElementById("btnStartSoak").disabled = true;
+  document.getElementById("btnStopSoak").disabled = false;
+  document.getElementById("btnExportSoakXls").disabled = true;
+
+  const durS = parseFloat(document.getElementById("inSoakDurMin").value) * 60;
+  const dtMs = parseFloat(document.getElementById("selSoakInterval").value) * 1000;
+  const camSel = document.getElementById("selSoakCam").value;
+  const cams = camSel.includes("BOTH") ? ["PHYA", "PHYB"] : (camSel.includes("PHYA") ? ["PHYA"] : ["PHYB"]);
+
+  const t0 = performance.now();
+  let cumErr = 0, lockDrops = 0;
+  const currs = [];
+
+  try {
+    while (!state.stopRequested) {
+      const elS = (performance.now() - t0) / 1000;
+      if (elS >= durS) break;
+
+      let i1Ma = 0;
+      if (state.psuConnected) {
+        const pt = await pollPsuMeters();
+        if (pt) { i1Ma = +(pt.i1 * 1000).toFixed(2); currs.push(i1Ma); }
+      }
+
+      let stepErr = 0;
+      if (state.evkitPort) {
+        await withEvkitLock(async () => {
+          for (const c of cams) {
+            if (!(await isLocked(c))) { lockDrops++; stepErr++; }
+            else {
+              const d1 = await readByte(state.serAddrMap[c], 0x1025);
+              const d2 = await readByte(DES_ADDR, CFG[c].decErr);
+              stepErr += (d1 + d2);
+            }
+          }
+        });
+      }
+      cumErr += stepErr;
+      state.soakRecords.push({ Elapsed_s: +elS.toFixed(1), CH1_mA: i1Ma, Step_Errors: stepErr, Cum_Errors: cumErr });
+
+      chartSoak.data.labels.push(elS.toFixed(1));
+      chartSoak.data.datasets[0].data.push(i1Ma);
+      chartSoak.data.datasets[1].data.push(cumErr);
+      chartSoak.update("none");
+
+      document.getElementById("progSoak").value = Math.min(100, Math.round((elS / durS) * 100));
+      document.getElementById("kpiSoakTime").textContent = `${(elS / 60).toFixed(2)}m / ${(durS / 60).toFixed(1)}m`;
+      document.getElementById("kpiSoakLock").textContent = lockDrops === 0 ? "100% STABLE" : `${lockDrops} DROP(S)`;
+      if (currs.length) {
+        const mn = Math.min(...currs).toFixed(1), mx = Math.max(...currs).toFixed(1);
+        const av = (currs.reduce((a, b) => a + b, 0) / currs.length).toFixed(1);
+        document.getElementById("kpiSoakCurr").textContent = `${mn} / ${av} / ${mx} mA`;
+      }
+      document.getElementById("kpiSoakErr").textContent = `${cumErr} errors`;
+
+      await sleep(dtMs);
+    }
+    document.getElementById("progSoak").value = 100;
+    if (state.soakRecords.length) document.getElementById("btnExportSoakXls").disabled = false;
+  } finally {
+    document.getElementById("btnStartSoak").disabled = false;
+    document.getElementById("btnStopSoak").disabled = true;
+  }
+});
+
+document.getElementById("btnExportSoakXls").addEventListener("click", () => {
+  if (!state.soakRecords.length || typeof XLSX === "undefined") return;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.soakRecords), "Soak_Log");
+  XLSX.writeFile(wb, `Valeo_GMSL2_Soak_Report_${Date.now()}.xlsx`);
+});
+
+</script>
+</body>
+</html>
