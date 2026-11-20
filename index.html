@@ -938,8 +938,7 @@ function appendLog(boxId, msg) {
   const el = document.getElementById(boxId);
   if (!el) return;
   const ts = new Date().toTimeString().split(" ")[0];
-  el.textContent += `[${ts}] ${msg}
-`;
+  el.textContent += `[${ts}] ${msg}\n`;
   el.scrollTop = el.scrollHeight;
 }
 function clearLog(boxId) {
@@ -1009,8 +1008,7 @@ async function sendEvkitCmd(cmdClean, timeoutMs = 120) {
   if (!state.evkitWriter || !state.evkitReader) throw new Error("EVKIT not connected");
   const enc = new TextEncoder();
   const dec = new TextDecoder();
-  await state.evkitWriter.write(enc.encode(cmdClean.trim() + "
-"));
+  await state.evkitWriter.write(enc.encode(cmdClean.trim() + "\r\n"));
 
   const t0 = performance.now();
   const lines = [];
@@ -1024,9 +1022,9 @@ async function sendEvkitCmd(cmdClean, timeoutMs = 120) {
     if (res.done) break;
     state.evkitLineBuf += dec.decode(res.value, { stream: true });
     let idx;
-    while ((idx = state.evkitLineBuf.indexOf("
-")) >= 0) {
-      const line = state.evkitLineBuf.slice(0, idx).replace(//g, "").trim();
+    while ((idx = state.evkitLineBuf.indexOf("\n")) >= 0) {
+      const line = state.evkitLineBuf.slice(0, idx).replace(/
+/g, "").trim();
       state.evkitLineBuf = state.evkitLineBuf.slice(idx + 1);
       if (!line || line.toUpperCase() === cmdClean.trim().toUpperCase()) continue;
       if (line.toUpperCase().includes("ERR") || line.toUpperCase().includes("NACK")) {
@@ -1179,7 +1177,8 @@ function analyzeScriptTopology(text) {
   let curLink = null;
   const linkToSer = {};
 
-  for (const rl of text.split(/?
+  for (const rl of text.split(/
+?
 /)) {
     const p = parseScriptLine(rl);
     if (!p || p.kind !== "WRITE") continue;
@@ -1245,7 +1244,8 @@ document.getElementById("fileInitScript").addEventListener("change", async ev =>
 async function runInitScript(turbo = true) {
   if (!state.evkitPort) throw new Error("Connect EVKIT USB/COM port first!");
   if (!state.scriptText) throw new Error("Upload a camera init script (.txt) first!");
-  const lines = state.scriptText.split(/?
+  const lines = state.scriptText.split(/
+?
 /);
 
   await withEvkitLock(async () => {
@@ -1262,8 +1262,7 @@ async function runInitScript(turbo = true) {
           await sleep(p.ms);
           continue;
         }
-        chunk += p.cmd + "
-";
+        chunk += p.cmd + "\r\n";
         count++;
         if (chunk.length > 1024) {
           await state.evkitWriter.write(enc.encode(chunk));
@@ -1791,7 +1790,8 @@ function computeSparamLimit(level, rate, param, fMhz) {
 
 function parseVnaCsv(text, filename) {
   const rows = [];
-  for (const raw of text.split(/?
+  for (const raw of text.split(/
+?
 /)) {
     const c = raw.split(",").map(s => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
     if (!c.length || c[0].startsWith("#") || c[0].startsWith("//")) continue;
@@ -1971,7 +1971,8 @@ document.getElementById("fileTdrCsv").addEventListener("change", async ev => {
   if (!f) return;
   try {
     const rows = [];
-    for (const raw of (await f.text()).split(/?
+    for (const raw of (await f.text()).split(/
+?
 /)) {
       const c = raw.split(",").map(s => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
       if (!c.length || c[0].startsWith("#")) continue;
@@ -2001,8 +2002,7 @@ function withPsuLock(fn) {
 
 async function psuWrite(cmd) {
   if (!state.psuWriter) throw new Error("PSU not connected");
-  await state.psuWriter.write(new TextEncoder().encode(cmd.trim() + "
-"));
+  await state.psuWriter.write(new TextEncoder().encode(cmd.trim() + "\n"));
 }
 
 async function psuQuery(cmd) {
@@ -2010,10 +2010,10 @@ async function psuQuery(cmd) {
   const dec = new TextDecoder();
   const t0 = performance.now();
   while ((performance.now() - t0) < 500) {
-    const idx = state.psuLineBuf.indexOf("
-");
+    const idx = state.psuLineBuf.indexOf("\n");
     if (idx >= 0) {
-      const line = state.psuLineBuf.slice(0, idx).replace(//g, "").trim();
+      const line = state.psuLineBuf.slice(0, idx).replace(/
+/g, "").trim();
       state.psuLineBuf = state.psuLineBuf.slice(idx + 1);
       return line;
     }
@@ -2181,7 +2181,8 @@ document.getElementById("btnI2cQuickWrite").addEventListener("click", async () =
 });
 
 document.getElementById("btnSendI2cBatch").addEventListener("click", async () => {
-  const lines = document.getElementById("txtI2cBatch").value.split(/?
+  const lines = document.getElementById("txtI2cBatch").value.split(/
+?
 /);
   await withEvkitLock(async () => {
     for (let i = 0; i < lines.length; i++) {
@@ -2193,6 +2194,320 @@ document.getElementById("btnSendI2cBatch").addEventListener("click", async () =>
     }
   });
 });
+
+// =============================================================================
+// S-PARAMETERS & TDR EXCEL EXPORTS + CLEAR
+// =============================================================================
+document.getElementById("btnClearSparam").addEventListener("click", () => {
+  state.sparamIl = null;
+  state.sparamRl = null;
+  document.getElementById("fileSparamIl").value = "";
+  document.getElementById("fileSparamRl").value = "";
+  document.getElementById("btnExportSparamXls").disabled = true;
+  document.getElementById("lblSparamIlStat").textContent = "NOT LOADED";
+  document.getElementById("lblSparamIlStat").className = "verdict-pill";
+  document.getElementById("lblSparamRlStat").textContent = "NOT LOADED";
+  document.getElementById("lblSparamRlStat").className = "verdict-pill";
+  document.getElementById("lblSparamOverall").textContent = "---";
+  document.getElementById("lblSparamOverall").className = "verdict-pill";
+  recomputeSparam();
+});
+
+document.getElementById("btnExportSparamXls").addEventListener("click", () => {
+  if (typeof XLSX === "undefined") return;
+  const level = document.getElementById("selSparamLevel").value;
+  const rate = document.getElementById("selSparamRate").value;
+  const maxF = rate === "6 Gbps" ? 3500 : 2000;
+  const wb = XLSX.utils.book_new();
+  const summary = [
+    ["GMSL2 - S-PARAMETER VALIDATION REPORT"],
+    ["Standard", `${level} | GMSL2 ${rate}`],
+    ["Sample ID", document.getElementById("inSparamSample").value || "N/A"],
+    ["Harness", document.getElementById("inSparamHarness").value || "N/A"],
+    ["Overall Verdict", document.getElementById("lblSparamOverall").textContent],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), "Summary");
+  if (state.sparamIl) {
+    const ilRows = [["Freq [MHz]", "Measured IL [dB]", "Limit [dB]", "Margin [dB]"]];
+    for (const r of state.sparamIl.rows) {
+      if (r.fMhz >= 2 && r.fMhz <= maxF) {
+        const lim = computeSparamLimit(level, rate, "IL", r.fMhz);
+        ilRows.push([+r.fMhz.toFixed(3), +r.v1.toFixed(3), +lim.toFixed(3), +(r.v1 - lim).toFixed(3)]);
+      }
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ilRows), "Insertion_Loss");
+  }
+  if (state.sparamRl) {
+    const rlRows = [["Freq [MHz]", "Measured RL [dB]", "Limit [dB]", "Margin [dB]"]];
+    for (const r of state.sparamRl.rows) {
+      if (r.fMhz >= 2 && r.fMhz <= maxF) {
+        const lim = computeSparamLimit(level, rate, "RL", r.fMhz);
+        rlRows.push([+r.fMhz.toFixed(3), +r.v1.toFixed(3), +lim.toFixed(3), +(lim - r.v1).toFixed(3)]);
+      }
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rlRows), "Return_Loss");
+  }
+  XLSX.writeFile(wb, `Valeo_GMSL2_SParam_Report_${Date.now()}.xlsx`);
+});
+
+document.getElementById("btnExportTdrXls").addEventListener("click", () => {
+  if (!state.tdrData || typeof XLSX === "undefined") return;
+  const wb = XLSX.utils.book_new();
+  const rows = [["Time [ns]", "Impedance [Ohm]", "Lower Limit [Ohm]", "Upper Limit [Ohm]", "Status"]];
+  for (const p of state.tdrData.rows) {
+    const st = p.z < 45 ? "LOW (<45 Ohm - INFO)" : (p.z > 55 ? "HIGH (>55 Ohm - INFO)" : "WITHIN BAND");
+    rows.push([+p.tNs.toFixed(4), +p.z.toFixed(4), 45, 55, st]);
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "TDR_Data");
+  XLSX.writeFile(wb, `Valeo_GMSL2_TDR_Report_${Date.now()}.xlsx`);
+});
+
+// =============================================================================
+// AUTOMATIC TEST SUITE
+// =============================================================================
+document.getElementById("btnStopAuto").addEventListener("click", () => { state.stopRequested = true; });
+
+document.getElementById("btnStartAuto").addEventListener("click", async () => {
+  if (!state.evkitPort) return alert("Connect EVKIT USB/COM port first!");
+  state.stopRequested = false;
+  state.autoResults = [];
+  const tbody = document.querySelector("#tblAutoResults tbody");
+  tbody.innerHTML = "";
+  document.getElementById("btnStartAuto").disabled = true;
+  document.getElementById("btnStopAuto").disabled = false;
+  document.getElementById("btnExportAutoXls").disabled = true;
+
+  const doMargin = document.getElementById("chkAutoMargin").checked;
+  const doEeprom = document.getElementById("chkAutoEeprom").checked;
+  const doErrb = document.getElementById("chkAutoErrb").checked;
+  const doCurr = document.getElementById("chkAutoCurrent").checked;
+  const psuCh = document.getElementById("selAutoPsuCh").value;
+  const volts = document.getElementById("inAutoVolts").value.split(",").map(s => parseFloat(s.trim())).filter(v => !isNaN(v));
+  const iLim = parseFloat(document.getElementById("inAutoIlim").value) || 1.0;
+  const sampleA = document.getElementById("inAutoSampleA").value || "Sample_A";
+  const sampleB = document.getElementById("inAutoSampleB").value || "Sample_B";
+  const cams = state.detectedTopology === "DUAL" ? ["PHYA", "PHYB"] : (state.detectedTopology === "SINGLE_PHYB" ? ["PHYB"] : ["PHYA"]);
+  const chs = psuCh === "BOTH" ? [1, 2] : (psuCh === "CH2" ? [2] : [1]);
+
+  try {
+    let step = 0;
+    const total = Math.max(1, volts.length * cams.length);
+    for (const v of volts) {
+      if (state.stopRequested) break;
+      document.getElementById("lblAutoStatus").textContent = `Status: Testing ${v.toFixed(2)} V...`;
+      appendLog("logAuto", `--- Setting PSU ${psuCh} -> ${v.toFixed(2)} V ---`);
+
+      let tIdle = null, tStream = null;
+      if (state.psuConnected) {
+        await withPsuLock(async () => {
+          for (const c of chs) await psuWrite(`OP${c} 0`);
+          await sleep(250);
+          for (const c of chs) {
+            await psuWrite(`V${c} ${v.toFixed(3)}`);
+            await psuWrite(`I${c} ${iLim.toFixed(4)}`);
+            await psuWrite(`OP${c} 1`);
+          }
+          await sleep(450);
+        });
+        tIdle = await pollPsuMeters();
+      }
+
+      if (state.scriptText) await runInitScript(true);
+      await sleep(300);
+      if (state.psuConnected) tStream = await pollPsuMeters();
+
+      for (const cam of cams) {
+        if (state.stopRequested) break;
+        const cNum = (chs.length === 1 || cam === "PHYA") ? chs[0] : chs[chs.length - 1];
+        const iIdleStr = (doCurr && tIdle) ? `${(tIdle[`i${cNum}`] * 1000).toFixed(1)} mA` : "N/A";
+        const iStrmStr = (doCurr && tStream) ? `${(tStream[`i${cNum}`] * 1000).toFixed(1)} mA` : "N/A";
+        const camOk = cam === "PHYA" ? state.lockA : state.lockB;
+        let eepStr = "Skipped", eepOk = true;
+        let errbStr = "Skipped", errbOk = true;
+        let fwdStr = "Skipped", revStr = "Skipped", margOk = true;
+
+        if (!camOk) {
+          eepStr = doEeprom ? "NO LOCK" : "Skipped";
+          errbStr = doErrb ? "NO LOCK" : "Skipped";
+          fwdStr = doMargin ? "NO LOCK" : "Skipped";
+          revStr = doMargin ? "NO LOCK" : "Skipped";
+          eepOk = !doEeprom; errbOk = !doErrb; margOk = !doMargin;
+        } else {
+          if (doEeprom) {
+            await withEvkitLock(async () => {
+              const serA = state.serAddrMap[cam], eepA = state.eepAddrMap[cam];
+              await writeByte(serA, 0x351C, eepA);
+              await writeByte(serA, 0x351D, EEPROM_DEFAULT_ADDR);
+              const rb = await sendEvkitCmd(`RB ${hex2(eepA)} 00 1`, 150);
+              eepOk = rb && !rb.toUpperCase().includes("ERR");
+              eepStr = eepOk ? `PASS (${rb})` : "FAIL";
+            });
+          }
+          if (doErrb) {
+            await withEvkitLock(async () => {
+              const s13 = await readByte(state.serAddrMap[cam], 0x0013);
+              errbOk = (s13 & 0x04) === 0;
+              errbStr = errbOk ? "PASS (0 Err)" : `FAIL (0x${hex2(s13)})`;
+            });
+          }
+          if (doMargin) {
+            // Trigger single-cam Link Margin sweep
+            document.getElementById("selMarginCam").value = `${cam} ONLY`;
+            document.getElementById("btnStartMargin").click();
+            while (document.getElementById("btnStartMargin").disabled) await sleep(200);
+            const r = state.lastMarginResults?.[cam];
+            if (r) {
+              fwdStr = `${r.fwdDelta} mV (${r.fwdStatus})`;
+              revStr = `${r.revDelta} mV (${r.revStatus})`;
+              margOk = r.fwdStatus === "PASS" && r.revStatus === "PASS";
+            }
+          }
+        }
+
+        const pass = camOk && eepOk && errbOk && margOk;
+        const rec = {
+          Voltage: `${v.toFixed(2)} V`,
+          PSU_CH: psuCh,
+          Port: cam,
+          Sample_ID: cam === "PHYA" ? sampleA : sampleB,
+          Idle_I: iIdleStr,
+          Stream_I: iStrmStr,
+          FWD: fwdStr,
+          REV: revStr,
+          EEPROM: eepStr,
+          ERRB: errbStr,
+          Verdict: pass ? "PASS" : "FAIL",
+        };
+        state.autoResults.push(rec);
+        const tr = document.createElement("tr");
+        tr.className = pass ? "row-pass" : "row-fail";
+        tr.innerHTML = Object.values(rec).map(val => `<td>${val}</td>`).join("");
+        tbody.appendChild(tr);
+
+        step++;
+        document.getElementById("progAuto").value = Math.round((step / total) * 100);
+      }
+    }
+    document.getElementById("lblAutoStatus").textContent = "Status: Automatic Test Suite FINISHED.";
+    if (state.autoResults.length) document.getElementById("btnExportAutoXls").disabled = false;
+  } finally {
+    document.getElementById("btnStartAuto").disabled = false;
+    document.getElementById("btnStopAuto").disabled = true;
+  }
+});
+
+document.getElementById("btnExportAutoXls").addEventListener("click", () => {
+  if (!state.autoResults.length || typeof XLSX === "undefined") return;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.autoResults), "Automatic_Test");
+  XLSX.writeFile(wb, `Valeo_GMSL2_Auto_Report_${Date.now()}.xlsx`);
+});
+
+// =============================================================================
+// LONG-RUN SOAK TEST
+// =============================================================================
+const chartSoak = new Chart(document.getElementById("chartSoak"), {
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [
+      { label: "CH1 Current [mA]", data: [], borderColor: "#0277BD", yAxisID: "y" },
+      { label: "Cumulative Errors", data: [], borderColor: "#D32F2F", yAxisID: "y1" },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { title: { display: true, text: "Elapsed [s]" } },
+      y: { type: "linear", position: "left", title: { display: true, text: "Current [mA]" } },
+      y1: { type: "linear", position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "Errors" } }
+    }
+  }
+});
+
+document.getElementById("btnStopSoak").addEventListener("click", () => { state.stopRequested = true; });
+
+document.getElementById("btnStartSoak").addEventListener("click", async () => {
+  state.stopRequested = false;
+  state.soakRecords = [];
+  chartSoak.data.labels = [];
+  chartSoak.data.datasets[0].data = [];
+  chartSoak.data.datasets[1].data = [];
+  chartSoak.update();
+
+  document.getElementById("btnStartSoak").disabled = true;
+  document.getElementById("btnStopSoak").disabled = false;
+  document.getElementById("btnExportSoakXls").disabled = true;
+
+  const durS = parseFloat(document.getElementById("inSoakDurMin").value) * 60;
+  const dtMs = parseFloat(document.getElementById("selSoakInterval").value) * 1000;
+  const camSel = document.getElementById("selSoakCam").value;
+  const cams = camSel.includes("BOTH") ? ["PHYA", "PHYB"] : (camSel.includes("PHYA") ? ["PHYA"] : ["PHYB"]);
+
+  const t0 = performance.now();
+  let cumErr = 0, lockDrops = 0;
+  const currs = [];
+
+  try {
+    while (!state.stopRequested) {
+      const elS = (performance.now() - t0) / 1000;
+      if (elS >= durS) break;
+
+      let i1Ma = 0;
+      if (state.psuConnected) {
+        const pt = await pollPsuMeters();
+        if (pt) { i1Ma = +(pt.i1 * 1000).toFixed(2); currs.push(i1Ma); }
+      }
+
+      let stepErr = 0;
+      if (state.evkitPort) {
+        await withEvkitLock(async () => {
+          for (const c of cams) {
+            if (!(await isLocked(c))) { lockDrops++; stepErr++; }
+            else {
+              const d1 = await readByte(state.serAddrMap[c], 0x1025);
+              const d2 = await readByte(DES_ADDR, CFG[c].decErr);
+              stepErr += (d1 + d2);
+            }
+          }
+        });
+      }
+      cumErr += stepErr;
+      state.soakRecords.push({ Elapsed_s: +elS.toFixed(1), CH1_mA: i1Ma, Step_Errors: stepErr, Cum_Errors: cumErr });
+
+      chartSoak.data.labels.push(elS.toFixed(1));
+      chartSoak.data.datasets[0].data.push(i1Ma);
+      chartSoak.data.datasets[1].data.push(cumErr);
+      chartSoak.update("none");
+
+      document.getElementById("progSoak").value = Math.min(100, Math.round((elS / durS) * 100));
+      document.getElementById("kpiSoakTime").textContent = `${(elS / 60).toFixed(2)}m / ${(durS / 60).toFixed(1)}m`;
+      document.getElementById("kpiSoakLock").textContent = lockDrops === 0 ? "100% STABLE" : `${lockDrops} DROP(S)`;
+      if (currs.length) {
+        const mn = Math.min(...currs).toFixed(1), mx = Math.max(...currs).toFixed(1);
+        const av = (currs.reduce((a, b) => a + b, 0) / currs.length).toFixed(1);
+        document.getElementById("kpiSoakCurr").textContent = `${mn} / ${av} / ${mx} mA`;
+      }
+      document.getElementById("kpiSoakErr").textContent = `${cumErr} errors`;
+
+      await sleep(dtMs);
+    }
+    document.getElementById("progSoak").value = 100;
+    if (state.soakRecords.length) document.getElementById("btnExportSoakXls").disabled = false;
+  } finally {
+    document.getElementById("btnStartSoak").disabled = false;
+    document.getElementById("btnStopSoak").disabled = true;
+  }
+});
+
+document.getElementById("btnExportSoakXls").addEventListener("click", () => {
+  if (!state.soakRecords.length || typeof XLSX === "undefined") return;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.soakRecords), "Soak_Log");
+  XLSX.writeFile(wb, `Valeo_GMSL2_Soak_Report_${Date.now()}.xlsx`);
+});
+
 </script>
 </body>
 </html>
